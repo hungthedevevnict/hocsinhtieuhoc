@@ -21,6 +21,6 @@ void main() {
     expect(find.text('Đánh Vần'), findsOneWidget);
     expect(find.text('Dấu Thanh'), findsOneWidget);
     expect(find.text('Đọc Từ'), findsOneWidget);
-    expect(find.text('Từ Ghép'), findsOneWidget);
+    expect(find.text('Bài Học'), findsOneWidget);
   });
 }

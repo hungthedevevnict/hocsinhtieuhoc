@@ -38,7 +38,7 @@ class HomeScreen extends StatelessWidget {
         builder: (_) => const WordsScreen(),
       ),
       _MenuData(
-        title: 'Từ Ghép',
+        title: 'Bài Học',
         emoji: '🔗',
         color: AppColors.compound,
         builder: (_) => const LessonsScreen(),

@@ -63,4 +63,19 @@ void main() {
     expect(r4.word, isNull);
     expect(r4.error, isNotNull);
   });
+
+  test('Tách 1 dòng chỉ 1 tiếng thành từ đơn (không báo lỗi)', () {
+    final r1 = parseCompoundWordLine('gà');
+    expect(r1.word?.word, 'gà');
+    expect(r1.word?.syllables.length, 1);
+    expect(r1.word?.emoji, '📚');
+
+    final r2 = parseCompoundWordLine('bé 👶');
+    expect(r2.word?.word, 'bé');
+    expect(r2.word?.emoji, '👶');
+
+    final r3 = parseCompoundWordLine('xyz');
+    expect(r3.word, isNull);
+    expect(r3.error, isNotNull);
+  });
 }

@@ -12,8 +12,9 @@ import '../widgets/kid_widgets.dart';
 import 'add_compound_word_screen.dart';
 import 'lesson_detail_screen.dart';
 
-/// Danh sách các bài đã lưu (gõ tay hoặc chụp ảnh AI đọc). Bấm vào 1 bài
-/// để mở lại và luyện đánh vần từ ghép trong bài đó.
+/// Danh sách các bài học đã lưu (gõ tay hoặc chụp ảnh AI đọc), mỗi bài có
+/// thể gắn với 1 chữ đang học, gồm từ đơn/từ ghép. Bấm vào 1 bài để mở lại
+/// và luyện đánh vần trong bài đó.
 class LessonsScreen extends StatefulWidget {
   const LessonsScreen({super.key});
 
@@ -167,7 +168,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
       children: [
         KidScaffold(
           color: _teal,
-          title: 'Từ Ghép',
+          title: 'Bài Học',
           actions: [
             KidAppBarAction(Icons.add_rounded, _openAddScreen),
             // Chụp ảnh AI chỉ có trên bản điện thoại (web bị chặn CORS + không kèm key).
@@ -224,7 +225,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               kIsWeb
-                  ? 'Chưa có bài nào.\nBấm ➕ để gõ thêm từ ghép nhé.'
+                  ? 'Chưa có bài nào.\nBấm ➕ để gõ thêm bài học nhé.'
                   : 'Chưa có bài nào.\nBấm ➕ để gõ tay, hoặc 📷 để chụp ảnh bài học.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -277,13 +278,38 @@ class _LessonCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        lesson.title,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.compound,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              lesson.title,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.compound,
+                              ),
+                            ),
+                          ),
+                          if (lesson.letter.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.compound.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                'Chữ ${lesson.letter}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.compound,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(

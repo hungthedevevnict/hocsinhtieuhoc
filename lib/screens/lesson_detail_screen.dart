@@ -102,7 +102,14 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
       return KidScaffold(
         color: _teal,
         title: widget.lesson.title,
-        body: const Center(child: Text('Bài này hết từ rồi.')),
+        body: Center(
+          child: Text(
+            widget.lesson.letter.isNotEmpty
+                ? 'Bài chữ ${widget.lesson.letter} chưa có từ nào.\nBấm ➕ ở Bài Học để gõ thêm từ nhé.'
+                : 'Bài này chưa có từ nào.',
+            textAlign: TextAlign.center,
+          ),
+        ),
       );
     }
     return KidScaffold(

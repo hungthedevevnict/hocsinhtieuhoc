@@ -6,7 +6,8 @@ class LetterItem {
   final String lower; // chữ thường: a
   final String name; // tên chữ để đọc: "a", "bê", "xê"...
   final String sound; // âm (cách đọc khi đánh vần): "a", "bờ", "cờ"...
-  final String exampleWord; // từ ví dụ: "bà", "cá"
+  final String exampleWord; // từ ví dụ (từ đơn): "bà", "cá"
+  final String compoundWord; // từ ghép minh hoạ thêm: "bà ngoại", "cá vàng"
   final String emoji; // hình minh hoạ
 
   const LetterItem({
@@ -15,41 +16,42 @@ class LetterItem {
     required this.name,
     required this.sound,
     required this.exampleWord,
+    required this.compoundWord,
     required this.emoji,
   });
 }
 
 /// 29 chữ cái tiếng Việt.
 const List<LetterItem> alphabet = [
-  LetterItem(upper: 'A', lower: 'a', name: 'a', sound: 'a', exampleWord: 'bà', emoji: '👵'),
-  LetterItem(upper: 'Ă', lower: 'ă', name: 'á', sound: 'á', exampleWord: 'ăn', emoji: '🍚'),
-  LetterItem(upper: 'Â', lower: 'â', name: 'ớ', sound: 'ớ', exampleWord: 'mây', emoji: '☁️'),
-  LetterItem(upper: 'B', lower: 'b', name: 'bê', sound: 'bờ', exampleWord: 'bóng', emoji: '⚽'),
-  LetterItem(upper: 'C', lower: 'c', name: 'xê', sound: 'cờ', exampleWord: 'cá', emoji: '🐟'),
-  LetterItem(upper: 'D', lower: 'd', name: 'dê', sound: 'dờ', exampleWord: 'dê', emoji: '🐐'),
-  LetterItem(upper: 'Đ', lower: 'đ', name: 'đê', sound: 'đờ', exampleWord: 'đèn', emoji: '💡'),
-  LetterItem(upper: 'E', lower: 'e', name: 'e', sound: 'e', exampleWord: 'xe', emoji: '🚗'),
-  LetterItem(upper: 'Ê', lower: 'ê', name: 'ê', sound: 'ê', exampleWord: 'bê', emoji: '🐄'),
-  LetterItem(upper: 'G', lower: 'g', name: 'giê', sound: 'gờ', exampleWord: 'gà', emoji: '🐔'),
-  LetterItem(upper: 'H', lower: 'h', name: 'hát', sound: 'hờ', exampleWord: 'hoa', emoji: '🌸'),
-  LetterItem(upper: 'I', lower: 'i', name: 'i', sound: 'i', exampleWord: 'bi', emoji: '🔵'),
-  LetterItem(upper: 'K', lower: 'k', name: 'ca', sound: 'cờ', exampleWord: 'kem', emoji: '🍦'),
-  LetterItem(upper: 'L', lower: 'l', name: 'e-lờ', sound: 'lờ', exampleWord: 'lá', emoji: '🍃'),
-  LetterItem(upper: 'M', lower: 'm', name: 'em-mờ', sound: 'mờ', exampleWord: 'mèo', emoji: '🐱'),
-  LetterItem(upper: 'N', lower: 'n', name: 'en-nờ', sound: 'nờ', exampleWord: 'nón', emoji: '👒'),
-  LetterItem(upper: 'O', lower: 'o', name: 'o', sound: 'o', exampleWord: 'bò', emoji: '🐄'),
-  LetterItem(upper: 'Ô', lower: 'ô', name: 'ô', sound: 'ô', exampleWord: 'ô', emoji: '☂️'),
-  LetterItem(upper: 'Ơ', lower: 'ơ', name: 'ơ', sound: 'ơ', exampleWord: 'cờ', emoji: '🚩'),
-  LetterItem(upper: 'P', lower: 'p', name: 'pê', sound: 'pờ', exampleWord: 'pin', emoji: '🔋'),
-  LetterItem(upper: 'Q', lower: 'q', name: 'quy', sound: 'quờ', exampleWord: 'quả', emoji: '🍎'),
-  LetterItem(upper: 'R', lower: 'r', name: 'e-rờ', sound: 'rờ', exampleWord: 'rùa', emoji: '🐢'),
-  LetterItem(upper: 'S', lower: 's', name: 'ét-sờ', sound: 'sờ', exampleWord: 'sao', emoji: '⭐'),
-  LetterItem(upper: 'T', lower: 't', name: 'tê', sound: 'tờ', exampleWord: 'táo', emoji: '🍎'),
-  LetterItem(upper: 'U', lower: 'u', name: 'u', sound: 'u', exampleWord: 'cú', emoji: '🦉'),
-  LetterItem(upper: 'Ư', lower: 'ư', name: 'ư', sound: 'ư', exampleWord: 'sư tử', emoji: '🦁'),
-  LetterItem(upper: 'V', lower: 'v', name: 'vê', sound: 'vờ', exampleWord: 'vịt', emoji: '🦆'),
-  LetterItem(upper: 'X', lower: 'x', name: 'ích-xì', sound: 'xờ', exampleWord: 'xe', emoji: '🚗'),
-  LetterItem(upper: 'Y', lower: 'y', name: 'i-dài', sound: 'i', exampleWord: 'cây', emoji: '🌳'),
+  LetterItem(upper: 'A', lower: 'a', name: 'a', sound: 'a', exampleWord: 'bà', compoundWord: 'bà ngoại', emoji: '👵'),
+  LetterItem(upper: 'Ă', lower: 'ă', name: 'á', sound: 'á', exampleWord: 'ăn', compoundWord: 'ăn cơm', emoji: '🍚'),
+  LetterItem(upper: 'Â', lower: 'â', name: 'ớ', sound: 'ớ', exampleWord: 'mây', compoundWord: 'mây trắng', emoji: '☁️'),
+  LetterItem(upper: 'B', lower: 'b', name: 'bê', sound: 'bờ', exampleWord: 'bóng', compoundWord: 'quả bóng', emoji: '⚽'),
+  LetterItem(upper: 'C', lower: 'c', name: 'xê', sound: 'cờ', exampleWord: 'cá', compoundWord: 'cá vàng', emoji: '🐟'),
+  LetterItem(upper: 'D', lower: 'd', name: 'dê', sound: 'dờ', exampleWord: 'dê', compoundWord: 'dê con', emoji: '🐐'),
+  LetterItem(upper: 'Đ', lower: 'đ', name: 'đê', sound: 'đờ', exampleWord: 'đèn', compoundWord: 'đèn lồng', emoji: '💡'),
+  LetterItem(upper: 'E', lower: 'e', name: 'e', sound: 'e', exampleWord: 'xe', compoundWord: 'xe đạp', emoji: '🚗'),
+  LetterItem(upper: 'Ê', lower: 'ê', name: 'ê', sound: 'ê', exampleWord: 'bê', compoundWord: 'con bê', emoji: '🐄'),
+  LetterItem(upper: 'G', lower: 'g', name: 'giê', sound: 'gờ', exampleWord: 'gà', compoundWord: 'gà con', emoji: '🐔'),
+  LetterItem(upper: 'H', lower: 'h', name: 'hát', sound: 'hờ', exampleWord: 'hoa', compoundWord: 'bông hoa', emoji: '🌸'),
+  LetterItem(upper: 'I', lower: 'i', name: 'i', sound: 'i', exampleWord: 'bi', compoundWord: 'viên bi', emoji: '🔵'),
+  LetterItem(upper: 'K', lower: 'k', name: 'ca', sound: 'cờ', exampleWord: 'kem', compoundWord: 'cây kem', emoji: '🍦'),
+  LetterItem(upper: 'L', lower: 'l', name: 'e-lờ', sound: 'lờ', exampleWord: 'lá', compoundWord: 'lá cây', emoji: '🍃'),
+  LetterItem(upper: 'M', lower: 'm', name: 'em-mờ', sound: 'mờ', exampleWord: 'mèo', compoundWord: 'mèo con', emoji: '🐱'),
+  LetterItem(upper: 'N', lower: 'n', name: 'en-nờ', sound: 'nờ', exampleWord: 'nón', compoundWord: 'cái nón', emoji: '👒'),
+  LetterItem(upper: 'O', lower: 'o', name: 'o', sound: 'o', exampleWord: 'bò', compoundWord: 'bò sữa', emoji: '🐄'),
+  LetterItem(upper: 'Ô', lower: 'ô', name: 'ô', sound: 'ô', exampleWord: 'ô', compoundWord: 'cái ô', emoji: '☂️'),
+  LetterItem(upper: 'Ơ', lower: 'ơ', name: 'ơ', sound: 'ơ', exampleWord: 'cờ', compoundWord: 'lá cờ', emoji: '🚩'),
+  LetterItem(upper: 'P', lower: 'p', name: 'pê', sound: 'pờ', exampleWord: 'pin', compoundWord: 'viên pin', emoji: '🔋'),
+  LetterItem(upper: 'Q', lower: 'q', name: 'quy', sound: 'quờ', exampleWord: 'quả', compoundWord: 'quả cam', emoji: '🍎'),
+  LetterItem(upper: 'R', lower: 'r', name: 'e-rờ', sound: 'rờ', exampleWord: 'rùa', compoundWord: 'con rùa', emoji: '🐢'),
+  LetterItem(upper: 'S', lower: 's', name: 'ét-sờ', sound: 'sờ', exampleWord: 'sao', compoundWord: 'ngôi sao', emoji: '⭐'),
+  LetterItem(upper: 'T', lower: 't', name: 'tê', sound: 'tờ', exampleWord: 'táo', compoundWord: 'quả táo', emoji: '🍎'),
+  LetterItem(upper: 'U', lower: 'u', name: 'u', sound: 'u', exampleWord: 'cú', compoundWord: 'con cú', emoji: '🦉'),
+  LetterItem(upper: 'Ư', lower: 'ư', name: 'ư', sound: 'ư', exampleWord: 'sư tử', compoundWord: 'vua sư tử', emoji: '🦁'),
+  LetterItem(upper: 'V', lower: 'v', name: 'vê', sound: 'vờ', exampleWord: 'vịt', compoundWord: 'con vịt', emoji: '🦆'),
+  LetterItem(upper: 'X', lower: 'x', name: 'ích-xì', sound: 'xờ', exampleWord: 'xe', compoundWord: 'xe đạp', emoji: '🚗'),
+  LetterItem(upper: 'Y', lower: 'y', name: 'i-dài', sound: 'i', exampleWord: 'cây', compoundWord: 'cây xanh', emoji: '🌳'),
 ];
 
 /// Âm đầu dùng cho ghép vần. Đã chọn các phụ âm không vướng luật
@@ -405,7 +407,8 @@ class SyllableSpec {
   }
 }
 
-/// Một từ ghép 2 tiếng để bé luyện đánh vần nối tiếng, vd "bờ đê".
+/// Một từ để bé luyện đánh vần — 1 tiếng (từ đơn, vd "gà") hoặc nhiều tiếng
+/// ghép nối tiếp (vd "bờ đê").
 class CompoundWord {
   final String emoji;
   final List<SyllableSpec> syllables;

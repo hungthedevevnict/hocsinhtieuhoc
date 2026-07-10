@@ -6,8 +6,11 @@ import '../data/syllable_parser.dart';
 import '../theme.dart';
 import '../widgets/kid_widgets.dart';
 
-/// Cho bố mẹ gõ tay nhiều từ ghép, mỗi dòng 1 từ (2 tiếng), đặt tên cho cả
-/// bài rồi lưu 1 lần. Vd gõ:
+/// Cho bố mẹ gõ tay 1 bài học: chữ đang học (vd "l, h"), nhiều từ đơn (1
+/// tiếng) hoặc từ ghép (nhiều tiếng), mỗi dòng 1 từ, đặt tên cho cả bài rồi
+/// lưu 1 lần. Không bắt buộc điền đủ — chỉ cần có 1 trong 3 (chữ/tên/từ) là
+/// lưu được, điền thêm dần sau cũng được. Vd gõ:
+///   gà
 ///   bờ đê
 ///   cá rô 🐟
 ///   ba mẹ
@@ -25,6 +28,7 @@ class AddCompoundWordScreen extends StatefulWidget {
 class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
   late final TextEditingController _wordsCtrl;
   late final TextEditingController _titleCtrl;
+  late final TextEditingController _letterCtrl;
   final FocusNode _wordsFocus = FocusNode();
   bool _saving = false;
   String? _lessonId; // set sau lần lưu đầu tiên, để lần lưu sau cộng vào cùng bài
@@ -37,6 +41,7 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
     _titleCtrl = TextEditingController(
       text: widget.initialTitle ?? 'Bài ${now.day}/${now.month}',
     );
+    _letterCtrl = TextEditingController();
     // Đang gõ (ô nhập được focus) thì ẩn hướng dẫn cho rộng chỗ.
     _wordsFocus.addListener(() {
       if (mounted) setState(() {});
@@ -47,6 +52,7 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
   void dispose() {
     _wordsCtrl.dispose();
     _titleCtrl.dispose();
+    _letterCtrl.dispose();
     _wordsFocus.dispose();
     super.dispose();
   }
@@ -68,19 +74,25 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
       // dòng trống: bỏ qua, không giữ lại trong ô nhập.
     }
 
-    if (goodWords.isEmpty && failedLines.isEmpty) {
-      _showMessage('Gõ ít nhất 1 từ nhé, mỗi dòng 2 tiếng (vd: bờ đê).');
+    final letter = _letterCtrl.text.trim();
+    final isFirstSave = _lessonId == null;
+    // Không bắt buộc điền đủ: có chữ đang học (lần lưu đầu) hoặc có từ hợp lệ là lưu được.
+    final hasSomethingToSave = goodWords.isNotEmpty || (isFirstSave && letter.isNotEmpty);
+
+    if (!hasSomethingToSave && failedLines.isEmpty) {
+      _showMessage('Gõ ít nhất 1 từ hoặc điền chữ đang học nhé.');
       return;
     }
 
     setState(() => _saving = true);
-    if (goodWords.isNotEmpty) {
-      if (_lessonId == null) {
-        final lesson = await LessonsStore.instance.addLesson(_titleCtrl.text, goodWords);
+    if (isFirstSave) {
+      if (goodWords.isNotEmpty || letter.isNotEmpty) {
+        final lesson = await LessonsStore.instance
+            .addLesson(_titleCtrl.text, goodWords, letter: letter);
         _lessonId = lesson.id;
-      } else {
-        await LessonsStore.instance.appendWords(_lessonId!, goodWords);
       }
+    } else if (goodWords.isNotEmpty) {
+      await LessonsStore.instance.appendWords(_lessonId!, goodWords);
     }
     setState(() {
       _saving = false;
@@ -109,7 +121,7 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
   Widget build(BuildContext context) {
     return KidScaffold(
       color: AppColors.compound,
-      title: 'Thêm Từ Ghép',
+      title: 'Thêm Bài Học',
       body: Column(
         children: [
           // Phần cuộn được: khi bàn phím bật lên, ô đang gõ tự cuộn lên trên.
@@ -130,12 +142,25 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _letterCtrl,
+                    enabled: _lessonId == null,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                    decoration: InputDecoration(
+                      labelText: 'Chữ đang học (không bắt buộc, vd: l, h)',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
                   // Hướng dẫn + ví dụ: ẩn khi đang gõ cho rộng chỗ.
                   if (!_wordsFocus.hasFocus) ...[
                     const SizedBox(height: 12),
                     Text(
-                      'Mỗi dòng gõ 1 từ, đủ 2 tiếng cách nhau bằng dấu cách. '
-                      'Thêm emoji ở cuối dòng cũng được (không bắt buộc).',
+                      'Mỗi dòng gõ 1 từ: 1 tiếng (từ đơn) hoặc nhiều tiếng cách '
+                      'nhau bằng dấu cách (từ ghép). Thêm emoji ở cuối dòng cũng '
+                      'được (không bắt buộc).',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -150,7 +175,7 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
-                        'bờ đê\ncá rô 🐟\nba mẹ',
+                        'gà\nbờ đê\ncá rô 🐟\nba mẹ',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,

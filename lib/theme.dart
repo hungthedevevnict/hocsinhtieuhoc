@@ -9,7 +9,7 @@ class AppColors {
   static const Color tones = Color(0xFFAB47BC); // tím
   static const Color words = Color(0xFF66BB6A); // xanh lá
   static const Color sunny = Color(0xFFFFCA28); // vàng
-  static const Color compound = Color(0xFF26C6DA); // xanh ngọc (từ ghép)
+  static const Color compound = Color(0xFF26C6DA); // xanh ngọc (bài học)
   static const Color ink = Color(0xFF3E2723); // nâu đậm cho chữ
 
   static const List<Color> tileColors = [

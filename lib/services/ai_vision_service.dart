@@ -23,11 +23,12 @@ class AiVisionService {
       'Bạn là trợ lý đọc chữ trong ảnh sách/bài tập Tiếng Việt cho học sinh lớp 1.';
 
   static const _userPrompt = '''
-Đọc TẤT CẢ các từ tiếng Việt có trong ảnh này, đừng bỏ sót từ nào.
+Đọc TẤT CẢ các từ tiếng Việt có trong ảnh này, đừng bỏ sót từ nào — kể cả từ đơn chỉ 1 tiếng
+(vd "gà", "bé") lẫn từ ghép nhiều tiếng (vd "bờ đê", "bố mẹ").
 Ảnh có thể trình bày nhiều cột — đọc theo thứ tự từ trái sang phải, từ trên xuống dưới.
 
-Mỗi cụm từ (thường gồm 2 tiếng, vd "Bờ đê", "Bố mẹ") là MỘT dòng kết quả riêng, giữ đúng thứ tự
-tiếng trong cụm đó.
+Mỗi từ là MỘT dòng kết quả riêng, giữ đúng số tiếng và thứ tự tiếng như trong ảnh — KHÔNG tự
+ghép 2 từ đơn cạnh nhau thành 1 dòng, và KHÔNG tự tách 1 từ ghép thành nhiều dòng.
 
 Giữ NGUYÊN dấu tiếng Việt, viết chữ thường. Chỉ trả về danh sách, mỗi từ 1 dòng — KHÔNG đánh số,
 KHÔNG markdown, KHÔNG giải thích gì thêm.

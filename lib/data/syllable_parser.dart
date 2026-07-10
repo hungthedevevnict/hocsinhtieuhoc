@@ -71,7 +71,8 @@ SyllableSpec? parseSyllable(String rawInput) {
   return null;
 }
 
-/// Kết quả tách 1 dòng nhập tay thành 1 từ ghép, hoặc lỗi nếu không hiểu.
+/// Kết quả tách 1 dòng nhập tay thành 1 từ (1 tiếng hoặc nhiều tiếng ghép),
+/// hoặc lỗi nếu không hiểu.
 class ParsedLineResult {
   final CompoundWord? word;
   final String? error;
@@ -79,7 +80,9 @@ class ParsedLineResult {
   const ParsedLineResult.fail(this.error) : word = null;
 }
 
-/// Mỗi dòng: tiếng 1, dấu cách, tiếng 2, rồi emoji tuỳ chọn ở cuối.
+/// Mỗi dòng: 1 hoặc nhiều tiếng liên tiếp (từ đơn hay từ ghép đều được),
+/// rồi emoji tuỳ chọn ở cuối. Đọc các tiếng từ trái sang phải, tiếng nào
+/// không hiểu được nữa thì coi phần còn lại của dòng là emoji/nhãn.
 ParsedLineResult parseCompoundWordLine(String line) {
   final cleaned = line.trim();
   if (cleaned.isEmpty) return const ParsedLineResult.fail(null); // dòng trống, bỏ qua âm thầm
@@ -90,19 +93,18 @@ ParsedLineResult parseCompoundWordLine(String line) {
       .where((t) => t.isNotEmpty)
       .toList();
 
-  if (tokens.length < 2) {
-    return ParsedLineResult.fail('"$cleaned" — cần gõ đủ 2 tiếng (vd: bờ đê)');
+  final syllables = <SyllableSpec>[];
+  var i = 0;
+  for (; i < tokens.length; i++) {
+    final s = parseSyllable(tokens[i]);
+    if (s == null) break;
+    syllables.add(s);
   }
 
-  final s1 = parseSyllable(tokens[0]);
-  final s2 = parseSyllable(tokens[1]);
-  if (s1 == null) {
+  if (syllables.isEmpty) {
     return ParsedLineResult.fail('Không hiểu tiếng "${tokens[0]}" trong "$cleaned"');
   }
-  if (s2 == null) {
-    return ParsedLineResult.fail('Không hiểu tiếng "${tokens[1]}" trong "$cleaned"');
-  }
 
-  final emoji = tokens.length > 2 ? tokens.sublist(2).join(' ') : '📚';
-  return ParsedLineResult.ok(CompoundWord(emoji, [s1, s2]));
+  final emoji = i < tokens.length ? tokens.sublist(i).join(' ') : '📚';
+  return ParsedLineResult.ok(CompoundWord(emoji, syllables));
 }

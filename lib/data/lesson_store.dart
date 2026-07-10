@@ -5,23 +5,28 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_data.dart';
 
 /// 1 buổi học bố mẹ tự nhập (gõ tay hoặc chụp ảnh nhờ AI đọc), gồm nhiều
-/// từ ghép. Lưu lại để đọc lại bất cứ lúc nào.
+/// từ đơn/từ ghép, có thể gắn với 1 chữ đang học (vd "l, h"). Lưu lại để
+/// đọc lại bất cứ lúc nào.
 class Lesson {
   final String id;
   final String title;
+  final String letter; // chữ đang học, vd "l, h" — có thể để trống
   final DateTime createdAt;
   final List<CompoundWord> words;
 
   const Lesson({
     required this.id,
     required this.title,
+    this.letter = '',
     required this.createdAt,
     required this.words,
   });
 
-  Lesson copyWith({String? title, List<CompoundWord>? words}) => Lesson(
+  Lesson copyWith({String? title, String? letter, List<CompoundWord>? words}) =>
+      Lesson(
         id: id,
         title: title ?? this.title,
+        letter: letter ?? this.letter,
         createdAt: createdAt,
         words: words ?? this.words,
       );
@@ -84,7 +89,7 @@ class LessonsStore {
 
   CompoundWord? _wordFromJson(Map<String, dynamic> m) {
     final raw = m['syllables'] as List<dynamic>?;
-    if (raw == null || raw.length != 2) return null;
+    if (raw == null || raw.isEmpty) return null;
     final syllables = raw
         .map((e) => _syllableFromJson(e as Map<String, dynamic>))
         .toList();
@@ -99,6 +104,7 @@ class LessonsStore {
   Map<String, dynamic> _lessonToJson(Lesson l) => {
         'id': l.id,
         'title': l.title,
+        'letter': l.letter,
         'createdAt': l.createdAt.millisecondsSinceEpoch,
         'words': l.words.map(_wordToJson).toList(),
       };
@@ -118,6 +124,7 @@ class LessonsStore {
     return Lesson(
       id: id,
       title: title,
+      letter: (m['letter'] as String?) ?? '', // bài cũ chưa có field này
       createdAt: DateTime.fromMillisecondsSinceEpoch(createdAtMs),
       words: words,
     );
@@ -145,10 +152,11 @@ class LessonsStore {
     await prefs.setString(_key, jsonEncode(lessons.map(_lessonToJson).toList()));
   }
 
-  Future<Lesson> addLesson(String title, List<CompoundWord> words) async {
+  Future<Lesson> addLesson(String title, List<CompoundWord> words, {String letter = ''}) async {
     final lesson = Lesson(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title.trim().isEmpty ? 'Bài chưa đặt tên' : title.trim(),
+      letter: letter.trim(),
       createdAt: DateTime.now(),
       words: words,
     );
