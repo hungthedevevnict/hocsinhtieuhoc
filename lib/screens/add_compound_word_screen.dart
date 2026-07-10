@@ -25,6 +25,7 @@ class AddCompoundWordScreen extends StatefulWidget {
 class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
   late final TextEditingController _wordsCtrl;
   late final TextEditingController _titleCtrl;
+  final FocusNode _wordsFocus = FocusNode();
   bool _saving = false;
   String? _lessonId; // set sau lần lưu đầu tiên, để lần lưu sau cộng vào cùng bài
 
@@ -36,12 +37,17 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
     _titleCtrl = TextEditingController(
       text: widget.initialTitle ?? 'Bài ${now.day}/${now.month}',
     );
+    // Đang gõ (ô nhập được focus) thì ẩn hướng dẫn cho rộng chỗ.
+    _wordsFocus.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _wordsCtrl.dispose();
     _titleCtrl.dispose();
+    _wordsFocus.dispose();
     super.dispose();
   }
 
@@ -104,84 +110,92 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
     return KidScaffold(
       color: AppColors.compound,
       title: 'Thêm Từ Ghép',
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _titleCtrl,
-              enabled: _lessonId == null,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              decoration: InputDecoration(
-                labelText: 'Tên bài',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Mỗi dòng gõ 1 từ, đủ 2 tiếng cách nhau bằng dấu cách. '
-              'Thêm emoji ở cuối dòng cũng được (không bắt buộc).',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ink.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.compound.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'bờ đê\ncá rô 🐟\nba mẹ',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.compound,
-                  height: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: TextField(
-                controller: _wordsCtrl,
-                autofocus: widget.initialText == null,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                decoration: InputDecoration(
-                  hintText: 'bờ đê\ncá rô\nba mẹ\n...',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none,
+      body: Column(
+        children: [
+          // Phần cuộn được: khi bàn phím bật lên, ô đang gõ tự cuộn lên trên.
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _titleCtrl,
+                    enabled: _lessonId == null,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                    decoration: InputDecoration(
+                      labelText: 'Tên bài',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.all(16),
-                ),
+                  // Hướng dẫn + ví dụ: ẩn khi đang gõ cho rộng chỗ.
+                  if (!_wordsFocus.hasFocus) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Mỗi dòng gõ 1 từ, đủ 2 tiếng cách nhau bằng dấu cách. '
+                      'Thêm emoji ở cuối dòng cũng được (không bắt buộc).',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.compound.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'bờ đê\ncá rô 🐟\nba mẹ',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.compound,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _wordsCtrl,
+                    focusNode: _wordsFocus,
+                    autofocus: widget.initialText == null,
+                    maxLines: null,
+                    minLines: 6,
+                    keyboardType: TextInputType.multiline,
+                    textAlignVertical: TextAlignVertical.top,
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                    decoration: InputDecoration(
+                      hintText: 'bờ đê\ncá rô\nba mẹ\n...',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.all(16),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: Center(
-                child: KidButton(
-                  label: _saving ? 'Đang lưu...' : 'Lưu bài này',
-                  icon: Icons.check_circle_rounded,
-                  color: AppColors.words,
-                  onTap: _saving ? () {} : _save,
-                ),
-              ),
+          ),
+          // Nút lưu luôn nằm dưới cùng, trên bàn phím.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+            child: KidButton(
+              label: _saving ? 'Đang lưu...' : 'Lưu bài này',
+              icon: Icons.check_circle_rounded,
+              color: AppColors.words,
+              onTap: _saving ? () {} : _save,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
