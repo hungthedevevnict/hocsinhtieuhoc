@@ -98,6 +98,12 @@ const Map<String, List<String>> tonedVowels = {
   'ơ': ['ơ', 'ớ', 'ờ', 'ở', 'ỡ', 'ợ'],
   'u': ['u', 'ú', 'ù', 'ủ', 'ũ', 'ụ'],
   'ư': ['ư', 'ứ', 'ừ', 'ử', 'ữ', 'ự'],
+  'y': ['y', 'ý', 'ỳ', 'ỷ', 'ỹ', 'ỵ'],
+};
+
+/// 12 chữ nguyên âm cơ bản (không dấu) — dùng để nhận diện phần vần.
+const Set<String> baseVowels = {
+  'a', 'ă', 'â', 'e', 'ê', 'i', 'o', 'ô', 'ơ', 'u', 'ư', 'y',
 };
 
 /// Một thanh (dấu). [name] để đọc/nói, [sample] là chữ mẫu hiện trên nút chọn.
@@ -320,50 +326,82 @@ const List<WordItem> pictureWords = [
   WordItem('bố', '👨'),
 ];
 
-/// Một tiếng trong từ ghép, đủ thông tin để đánh vần riêng tiếng đó.
-/// Vd: SyllableSpec('b', 'bờ', 'ơ', 0) => tiếng "bờ" (âm đầu b, vần ơ, thanh ngang).
-/// [coda] là âm cuối (vd "n" trong "con"), để trống '' nếu tiếng mở.
+/// Đọc âm của phụ âm (dùng chung cho âm đầu và âm cuối khi đánh vần).
+const Map<String, String> consonantSound = {
+  'b': 'bờ', 'c': 'cờ', 'ch': 'chờ', 'd': 'dờ', 'đ': 'đờ', 'g': 'gờ', 'gh': 'gờ',
+  'gi': 'giờ', 'h': 'hờ', 'k': 'cờ', 'kh': 'khờ', 'l': 'lờ', 'm': 'mờ', 'n': 'nờ',
+  'ng': 'ngờ', 'ngh': 'ngờ', 'nh': 'nhờ', 'p': 'pờ', 'ph': 'phờ', 'qu': 'quờ',
+  'r': 'rờ', 's': 'sờ', 't': 'tờ', 'th': 'thờ', 'tr': 'trờ', 'v': 'vờ', 'x': 'xờ',
+};
+
+/// Âm cuối 2 chữ và 1 chữ (để tách vần thành nguyên âm + âm cuối).
+const Set<String> _finals2 = {'ng', 'nh', 'ch'};
+const Set<String> _finals1 = {'c', 'm', 'n', 'p', 't'};
+
+/// Một tiếng, đủ thông tin để đánh vần riêng tiếng đó. Hỗ trợ MỌI vần
+/// tiếng Việt (kể cả vần đôi/ba: oa, iê, uôi, ương, khuyên...).
+///
+/// - [onset]: âm đầu ("b","qu","gi","ngh"...), '' nếu tiếng bắt đầu bằng nguyên âm.
+/// - [onsetSound]: cách đọc âm đầu ("bờ","quờ"...), '' nếu không có âm đầu.
+/// - [rime]: vần CHƯA dấu ("a","oa","iên","uôi","ương").
+/// - [tone]: chỉ số thanh 0..5 (ngang, sắc, huyền, hỏi, ngã, nặng).
+/// - [syllable]: tiếng CÓ dấu, lưu sẵn từ lúc phân tích ("bố","quyển","hoa").
 class SyllableSpec {
-  final String letter; // chữ viết âm đầu: "b", "đ", "c", "g"...
-  final String sound; // đọc âm: "bờ", "đờ", "cờ", "gờ"...
-  final String vowel; // nguyên âm (không âm cuối): "ơ", "ê", "a"...
-  final int tone; // chỉ số thanh trong tones6 (0=ngang...5=nặng)
-  final String coda; // âm cuối: '', 'c','ch','m','n','ng','nh','p','t'
+  final String onset;
+  final String onsetSound;
+  final String rime;
+  final int tone;
+  final String syllable;
 
-  const SyllableSpec(this.letter, this.sound, this.vowel, this.tone, [this.coda = '']);
+  const SyllableSpec(this.onset, this.onsetSound, this.rime, this.tone, this.syllable);
 
-  /// Đọc âm cuối (dùng chung bảng đọc phụ âm với âm đầu).
-  static const Map<String, String> _consonantSound = {
-    'b': 'bờ', 'c': 'cờ', 'ch': 'chờ', 'd': 'dờ', 'đ': 'đờ', 'g': 'gờ', 'gi': 'giờ',
-    'h': 'hờ', 'k': 'cờ', 'kh': 'khờ', 'l': 'lờ', 'm': 'mờ', 'n': 'nờ', 'ng': 'ngờ',
-    'ngh': 'ngờ', 'nh': 'nhờ', 'p': 'pờ', 'ph': 'phờ', 'qu': 'quờ', 'r': 'rờ',
-    's': 'sờ', 't': 'tờ', 'th': 'thờ', 'tr': 'trờ', 'v': 'vờ', 'x': 'xờ',
-  };
+  /// Tiếng chưa dấu: "bô", "quyên", "hoa".
+  String get base => '$onset$rime';
 
-  /// Vần (nguyên âm + âm cuối, chưa có dấu): "ơ" hoặc "on", "anh"...
-  String get rime => '$vowel$coda';
-
-  /// Tiếng chưa có dấu: "bơ" hoặc "con", "canh"...
-  String get base => '$letter$rime';
-
-  String get syllable => '$letter${tonedVowels[vowel]![tone]}$coda';
-
-  /// Đánh vần riêng tiếng này.
-  /// - Tiếng mở: "bờ - ơ - bờ" hoặc "đờ - ê - đê - huyền - đề".
-  /// - Tiếng có âm cuối: "o - n - on - cờ - on - con" hoặc thêm dấu:
-  ///   "o - n - on - cờ - on - con - huyền - còn".
-  List<String> get spellParts {
-    if (coda.isEmpty) {
-      return tone == 0
-          ? [sound, vowel, base]
-          : [sound, vowel, base, tones6[tone].name, syllable];
+  /// Tách vần thành (nguyên âm, âm cuối). Vd "iên" => ("iê","n"), "oa" => ("oa","").
+  (String, String) get _split {
+    if (rime.length >= 2 && _finals2.contains(rime.substring(rime.length - 2))) {
+      return (rime.substring(0, rime.length - 2), rime.substring(rime.length - 2));
     }
-    final codaSound = _consonantSound[coda] ?? coda;
-    // Không có âm đầu (vd "ăn"): chỉ cần đánh vần phần vần, không ghép thêm.
-    final steps = letter.isEmpty
-        ? [vowel, codaSound, rime]
-        : [vowel, codaSound, rime, sound, rime, base];
-    return tone == 0 ? steps : [...steps, tones6[tone].name, syllable];
+    if (rime.length >= 2 && _finals1.contains(rime.substring(rime.length - 1))) {
+      return (rime.substring(0, rime.length - 1), rime.substring(rime.length - 1));
+    }
+    return (rime, '');
+  }
+
+  /// Đánh vần bên trong vần: "on" => [o, nờ, on]; "oa" => [o, a, oa];
+  /// "iên" => [i, ê, nờ, iên]. Vần chỉ 1 nguyên âm, không âm cuối => rỗng.
+  List<String> get _rimeInner {
+    final (vowels, coda) = _split;
+    if (vowels.length <= 1 && coda.isEmpty) return const [];
+    final steps = <String>[...vowels.split('')];
+    if (coda.isNotEmpty) steps.add(consonantSound[coda] ?? coda);
+    steps.add(rime);
+    return steps;
+  }
+
+  /// Các bước đánh vần đầy đủ của tiếng, theo kiểu lớp 1. Ví dụ:
+  /// - "ba"  => [bờ, a, ba]
+  /// - "bố"  => [bờ, ô, bô, sắc, bố]
+  /// - "con" => [o, nờ, on, cờ, on, con]
+  /// - "hoa" => [o, a, oa, hờ, oa, hoa]
+  /// - "khuyên" => [u, y, ê, nờ, uyên, khờ, uyên, khuyên]
+  List<String> get spellParts {
+    final inner = _rimeInner;
+    final steps = <String>[];
+    if (onset.isEmpty) {
+      steps.addAll(inner.isEmpty ? [rime] : inner);
+    } else {
+      steps.addAll(inner);
+      steps.add(onsetSound);
+      steps.add(rime);
+      steps.add(base);
+    }
+    if (tone != 0) {
+      steps.add(tones6[tone].name);
+      steps.add(syllable);
+    }
+    return steps;
   }
 }
 

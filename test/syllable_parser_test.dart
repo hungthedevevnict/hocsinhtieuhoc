@@ -3,37 +3,47 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:danh_van_tieng_viet/data/syllable_parser.dart';
 
 void main() {
-  test('Tách đúng các tiếng đơn giản thường gặp', () {
-    final cases = <String, String>{
-      'bờ': 'bờ', 'đê': 'đê', 'cá': 'cá', 'rô': 'rô',
-      'ba': 'ba', 'mẹ': 'mẹ', 'bố': 'bố', 'nhà': 'nhà',
-      'thơ': 'thơ', 'gà': 'gà', 'cô': 'cô', 'chú': 'chú',
-      'nghé': 'nghé', 'già': 'già', 'gì': 'gì', 'giá': 'giá',
-      'thỏ': 'thỏ', 'khỉ': 'khỉ', 'quê': 'quê',
-    };
-    for (final entry in cases.entries) {
-      final spec = parseSyllable(entry.key);
-      expect(spec, isNotNull, reason: 'Không tách được "${entry.key}"');
-      expect(spec!.syllable, entry.value, reason: 'Sai kết quả cho "${entry.key}"');
+  test('Tách đúng — tiếng đơn giản (âm đầu + 1 nguyên âm)', () {
+    for (final w in ['bờ', 'đê', 'cá', 'rô', 'ba', 'mẹ', 'bố', 'nhà', 'thơ',
+      'gà', 'cô', 'chú', 'nghé', 'già', 'gì', 'giá', 'thỏ', 'khỉ', 'quê']) {
+      final s = parseSyllable(w);
+      expect(s, isNotNull, reason: 'Không tách được "$w"');
+      expect(s!.syllable, w, reason: 'Sai kết quả "$w"');
     }
   });
 
-  test('Tách đúng tiếng có âm cuối', () {
-    final cases = <String, String>{
-      'con': 'con', 'bàn': 'bàn', 'còn': 'còn', 'cơm': 'cơm',
-      'bát': 'bát', 'sách': 'sách', 'thóc': 'thóc', 'ngon': 'ngon',
-      'ăn': 'ăn', 'ấm': 'ấm',
-    };
-    for (final entry in cases.entries) {
-      final spec = parseSyllable(entry.key);
-      expect(spec, isNotNull, reason: 'Không tách được "${entry.key}"');
-      expect(spec!.syllable, entry.value, reason: 'Sai kết quả cho "${entry.key}"');
+  test('Tách đúng — tiếng có âm cuối', () {
+    for (final w in ['con', 'bàn', 'còn', 'cơm', 'bát', 'sách', 'thóc',
+      'ngon', 'ăn', 'ấm', 'ông', 'anh', 'canh', 'kính', 'lớp']) {
+      final s = parseSyllable(w);
+      expect(s, isNotNull, reason: 'Không tách được "$w"');
+      expect(s!.syllable, w, reason: 'Sai kết quả "$w"');
     }
   });
 
-  test('Từ chối tiếng có nguyên âm đôi/ba (chưa hỗ trợ)', () {
-    for (final word in ['yêu', 'oanh', 'ngoan', 'ngoài', 'huy']) {
-      expect(parseSyllable(word), isNull, reason: '"$word" không nên tách được');
+  test('Tách đúng — vần đôi/ba (giờ đã hỗ trợ)', () {
+    for (final w in ['hoa', 'yêu', 'khuyên', 'ngoan', 'buồn', 'chuối',
+      'hươu', 'nước', 'người', 'tiên', 'biển', 'muỗi', 'quả', 'thuyền',
+      'oanh', 'uyên', 'khoai', 'nguyễn']) {
+      final s = parseSyllable(w);
+      expect(s, isNotNull, reason: 'Không tách được "$w"');
+      expect(s!.syllable, w, reason: 'Sai kết quả "$w"');
+    }
+  });
+
+  test('Đánh vần đúng vài trường hợp tiêu biểu', () {
+    expect(parseSyllable('ba')!.spellParts, ['bờ', 'a', 'ba']);
+    expect(parseSyllable('bố')!.spellParts, ['bờ', 'ô', 'bô', 'sắc', 'bố']);
+    expect(parseSyllable('con')!.spellParts, ['o', 'nờ', 'on', 'cờ', 'on', 'con']);
+    expect(parseSyllable('còn')!.spellParts,
+        ['o', 'nờ', 'on', 'cờ', 'on', 'con', 'huyền', 'còn']);
+    expect(parseSyllable('hoa')!.spellParts, ['o', 'a', 'oa', 'hờ', 'oa', 'hoa']);
+    expect(parseSyllable('ăn')!.spellParts, ['ă', 'nờ', 'ăn']);
+  });
+
+  test('Từ chối ký tự lạ / không phải tiếng Việt', () {
+    for (final w in ['xyz', 'w', '123', 'ब']) {
+      expect(parseSyllable(w), isNull, reason: '"$w" không nên tách được');
     }
   });
 
@@ -42,16 +52,15 @@ void main() {
     expect(r1.word?.word, 'bờ đê');
     expect(r1.word?.emoji, '📚');
 
-    final r2 = parseCompoundWordLine('cá rô 🐟');
-    expect(r2.word?.word, 'cá rô');
-    expect(r2.word?.emoji, '🐟');
+    final r2 = parseCompoundWordLine('con bò 🐄');
+    expect(r2.word?.word, 'con bò');
+    expect(r2.word?.emoji, '🐄');
 
-    final r3 = parseCompoundWordLine('xyz đê');
-    expect(r3.word, isNull);
-    expect(r3.error, isNotNull);
+    final r3 = parseCompoundWordLine('bông hoa');
+    expect(r3.word?.word, 'bông hoa');
 
-    final r4 = parseCompoundWordLine('   ');
+    final r4 = parseCompoundWordLine('xyz đê');
     expect(r4.word, isNull);
-    expect(r4.error, isNull);
+    expect(r4.error, isNotNull);
   });
 }

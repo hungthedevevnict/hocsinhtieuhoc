@@ -1,61 +1,72 @@
 import 'app_data.dart';
 
-/// Tách 1 tiếng gõ tay (vd "đề", "con", "bàn") thành âm đầu + vần (nguyên âm
-/// + âm cuối) + thanh, để tạo SyllableSpec mà không cần bố mẹ chọn từng chip.
+/// Tách 1 tiếng gõ tay (vd "đề", "con", "hoa", "khuyên") thành âm đầu + vần +
+/// thanh, để tạo [SyllableSpec] mà không cần bố mẹ chọn từng chip.
 ///
-/// Chỉ nhận tiếng có 1 NGUYÊN ÂM ĐƠN (a,ă,â,e,ê,i,o,ô,ơ,u,ư) làm vần — CHƯA
-/// hỗ trợ nguyên âm đôi/ba (iê, ươ, oa...). Âm cuối (nếu có) phải là 1 trong
-/// 8 âm cuối hợp lệ: c, ch, m, n, ng, nh, p, t.
+/// Hỗ trợ MỌI vần tiếng Việt: nguyên âm đơn, nguyên âm đôi/ba, có/không âm cuối.
+/// Chỉ từ chối khi tiếng có ký tự lạ hoặc cấu trúc không phải tiếng Việt.
 
-/// Các cụm phụ âm đầu, xếp dài → ngắn để so khớp tham lam đúng thứ tự.
-const List<String> _onsetCandidates = [
+/// Các âm đầu, xếp DÀI → NGẮN để so khớp tham lam đúng thứ tự.
+const List<String> _onsets = [
   'ngh',
-  'ng', 'nh', 'ch', 'th', 'ph', 'kh', 'tr', 'gi', 'qu',
+  'ch', 'gh', 'gi', 'kh', 'ng', 'nh', 'ph', 'qu', 'th', 'tr',
   'b', 'c', 'd', 'đ', 'g', 'h', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x',
 ];
 
-const Map<String, String> _onsetSound = {
-  'b': 'bờ', 'c': 'cờ', 'ch': 'chờ', 'd': 'dờ', 'đ': 'đờ',
-  'g': 'gờ', 'gi': 'giờ', 'h': 'hờ', 'k': 'cờ', 'kh': 'khờ',
-  'l': 'lờ', 'm': 'mờ', 'n': 'nờ', 'ng': 'ngờ', 'ngh': 'ngờ',
-  'nh': 'nhờ', 'p': 'pờ', 'ph': 'phờ', 'qu': 'quờ', 'r': 'rờ',
-  's': 'sờ', 't': 'tờ', 'th': 'thờ', 'tr': 'trờ', 'v': 'vờ', 'x': 'xờ',
-};
+/// Âm cuối 2 chữ / 1 chữ.
+const Set<String> _finals2 = {'ng', 'nh', 'ch'};
+const Set<String> _finals1 = {'c', 'm', 'n', 'p', 't'};
 
-/// Tra ngược: mỗi chữ nguyên âm có dấu → (nguyên âm gốc, chỉ số thanh).
-final Map<String, (String vowel, int tone)> _reverseTone = {
+/// Tra ngược: mỗi chữ nguyên âm (có/không dấu) → (nguyên âm gốc, chỉ số thanh).
+final Map<String, (String, int)> _reverseTone = {
   for (final entry in tonedVowels.entries)
     for (var t = 0; t < entry.value.length; t++) entry.value[t]: (entry.key, t),
 };
 
-/// Thử tách [remainder] (phần còn lại sau âm đầu) thành nguyên âm (+ dấu)
-/// và âm cuối tuỳ chọn. Trả về null nếu không khớp (vd nguyên âm đôi).
-(String vowel, int tone, String coda)? _splitRime(String remainder) {
-  if (remainder.isEmpty) return null;
-  final vowelChar = remainder.substring(0, 1);
-  final coda = remainder.substring(1);
-  final hit = _reverseTone[vowelChar];
-  if (hit == null) return null;
-  if (coda.isEmpty) return (hit.$1, hit.$2, '');
-  if (validFinals.contains(coda)) return (hit.$1, hit.$2, coda);
-  return null;
+/// Bỏ dấu thanh khỏi tiếng: trả về (tiếng chưa dấu, chỉ số thanh).
+/// Vd "quyển" => ("quyên", 3). Mỗi tiếng tiếng Việt có tối đa 1 dấu thanh.
+(String, int) _stripTone(String s) {
+  for (var i = 0; i < s.length; i++) {
+    final hit = _reverseTone[s[i]];
+    if (hit != null && hit.$2 != 0) {
+      return (s.substring(0, i) + hit.$1 + s.substring(i + 1), hit.$2);
+    }
+  }
+  return (s, 0);
+}
+
+/// Kiểm tra phần vần (chưa dấu) có hợp lệ không: 1-3 nguyên âm + âm cuối tuỳ chọn.
+bool _isValidRime(String rime) {
+  if (rime.isEmpty) return false;
+  var vowels = rime;
+  if (rime.length >= 2 && _finals2.contains(rime.substring(rime.length - 2))) {
+    vowels = rime.substring(0, rime.length - 2);
+  } else if (rime.length >= 2 && _finals1.contains(rime.substring(rime.length - 1))) {
+    vowels = rime.substring(0, rime.length - 1);
+  }
+  if (vowels.isEmpty || vowels.length > 3) return false;
+  for (final ch in vowels.split('')) {
+    if (!baseVowels.contains(ch)) return false;
+  }
+  return true;
 }
 
 SyllableSpec? parseSyllable(String rawInput) {
-  final s = rawInput.trim().toLowerCase();
-  if (s.isEmpty) return null;
+  final input = rawInput.trim();
+  if (input.isEmpty) return null;
+  final (base, tone) = _stripTone(input.toLowerCase());
 
-  for (final onset in _onsetCandidates) {
-    if (!s.startsWith(onset)) continue;
-    final rime = _splitRime(s.substring(onset.length));
-    if (rime != null) {
-      return SyllableSpec(onset, _onsetSound[onset]!, rime.$1, rime.$2, rime.$3);
+  // Thử tách âm đầu (dài → ngắn), phần còn lại là vần.
+  for (final onset in _onsets) {
+    if (!base.startsWith(onset)) continue;
+    final rime = base.substring(onset.length);
+    if (_isValidRime(rime)) {
+      return SyllableSpec(onset, consonantSound[onset]!, rime, tone, input);
     }
   }
-  // Không có âm đầu (tiếng bắt đầu ngay bằng nguyên âm), vd "ở", "ăn".
-  final rime = _splitRime(s);
-  if (rime != null) {
-    return SyllableSpec('', rime.$1, rime.$1, rime.$2, rime.$3);
+  // Không có âm đầu (tiếng bắt đầu bằng nguyên âm): "ăn", "oa", "yêu"...
+  if (_isValidRime(base)) {
+    return SyllableSpec('', '', base, tone, input);
   }
   return null;
 }

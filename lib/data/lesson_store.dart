@@ -36,28 +36,45 @@ class LessonsStore {
   static const _key = 'lessons_v1';
 
   Map<String, dynamic> _syllableToJson(SyllableSpec s) => {
-        'letter': s.letter,
-        'sound': s.sound,
-        'vowel': s.vowel,
+        'onset': s.onset,
+        'onsetSound': s.onsetSound,
+        'rime': s.rime,
         'tone': s.tone,
-        'coda': s.coda,
+        'syllable': s.syllable,
       };
 
   SyllableSpec? _syllableFromJson(Map<String, dynamic> m) {
-    final vowel = m['vowel'] as String?;
     final tone = m['tone'] as int?;
-    final coda = (m['coda'] as String?) ?? '';
-    if (vowel == null || tone == null) return null;
-    if (!tonedVowels.containsKey(vowel)) return null;
-    if (tone < 0 || tone > 5) return null;
-    if (coda.isNotEmpty && !validFinals.contains(coda)) return null;
-    return SyllableSpec(
-      (m['letter'] as String?) ?? '',
-      (m['sound'] as String?) ?? vowel,
-      vowel,
-      tone,
-      coda,
-    );
+    if (tone == null || tone < 0 || tone > 5) return null;
+
+    // Định dạng mới: onset + rime + syllable.
+    final rime = m['rime'] as String?;
+    final syllable = m['syllable'] as String?;
+    if (rime != null && syllable != null && syllable.isNotEmpty) {
+      return SyllableSpec(
+        (m['onset'] as String?) ?? '',
+        (m['onsetSound'] as String?) ?? '',
+        rime,
+        tone,
+        syllable,
+      );
+    }
+
+    // Định dạng cũ: letter + vowel + coda (dựng lại cho tương thích ngược).
+    final vowel = m['vowel'] as String?;
+    if (vowel != null && tonedVowels.containsKey(vowel)) {
+      final letter = (m['letter'] as String?) ?? '';
+      final coda = (m['coda'] as String?) ?? '';
+      final toned = '${tonedVowels[vowel]![tone]}$coda';
+      return SyllableSpec(
+        letter,
+        (m['sound'] as String?) ?? '',
+        '$vowel$coda',
+        tone,
+        '$letter$toned',
+      );
+    }
+    return null;
   }
 
   Map<String, dynamic> _wordToJson(CompoundWord w) => {
