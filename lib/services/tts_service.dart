@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 /// Bộ phát âm tiếng Việt dùng chung cho toàn app.
@@ -19,39 +20,49 @@ class TtsService {
   Future<void> init() async {
     if (_ready) return;
 
-    // QUAN TRỌNG trên iOS: dùng shared audio session và đặt category = playback
-    // để app phát tiếng ngay cả khi bật nút gạt im lặng (silent switch),
-    // và không bị các app khác làm câm.
-    await _tts.setSharedInstance(true);
-    await _tts.setIosAudioCategory(
-      IosTextToSpeechAudioCategory.playback,
-      [
-        IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
-        IosTextToSpeechAudioCategoryOptions.allowBluetooth,
-        IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
-        IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-      ],
-      IosTextToSpeechAudioMode.defaultMode,
-    );
-
-    // Chọn giọng tiếng Việt: ưu tiên vi-VN, nếu máy dùng mã khác thì dò tìm.
-    await _tts.setLanguage('vi-VN');
-    final langs = (await _tts.getLanguages) as List<dynamic>?;
-    if (langs != null) {
-      final vi = langs
-          .map((e) => e.toString())
-          .firstWhere(
-            (l) => l.toLowerCase().startsWith('vi'),
-            orElse: () => 'vi-VN',
-          );
-      await _tts.setLanguage(vi);
+    // Cấu hình audio session CHỈ dành cho iOS (giúp phát tiếng cả khi gạt im
+    // lặng). Trên web/Android các lệnh này không tồn tại nên phải bỏ qua, nếu
+    // không sẽ ném lỗi và làm hỏng toàn bộ init → mất tiếng.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      try {
+        await _tts.setSharedInstance(true);
+        await _tts.setIosAudioCategory(
+          IosTextToSpeechAudioCategory.playback,
+          [
+            IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+            IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+            IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+            IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+          ],
+          IosTextToSpeechAudioMode.defaultMode,
+        );
+      } catch (_) {}
     }
 
-    await _tts.setSpeechRate(_defaultRate);
-    await _tts.setPitch(1.05);
-    await _tts.setVolume(1.0);
-    // Chờ đọc xong mới trả về ở lệnh speak (giúp đọc nối tiếp).
-    await _tts.awaitSpeakCompletion(true);
+    // Chọn giọng tiếng Việt: ưu tiên vi-VN, nếu máy dùng mã khác thì dò tìm.
+    // Bọc try/catch từng lệnh để một lệnh không hỗ trợ (trên web) không làm
+    // hỏng cả init.
+    try {
+      await _tts.setLanguage('vi-VN');
+      final langs = (await _tts.getLanguages) as List<dynamic>?;
+      if (langs != null) {
+        final vi = langs.map((e) => e.toString()).firstWhere(
+              (l) => l.toLowerCase().startsWith('vi'),
+              orElse: () => 'vi-VN',
+            );
+        await _tts.setLanguage(vi);
+      }
+    } catch (_) {}
+
+    try {
+      await _tts.setSpeechRate(_defaultRate);
+      await _tts.setPitch(1.05);
+      await _tts.setVolume(1.0);
+    } catch (_) {}
+    try {
+      // Chờ đọc xong mới trả về ở lệnh speak (giúp đọc nối tiếp).
+      await _tts.awaitSpeakCompletion(true);
+    } catch (_) {}
     _ready = true;
   }
 
