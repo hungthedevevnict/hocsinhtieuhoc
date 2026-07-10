@@ -5,10 +5,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 
+import 'tts_cache_stub.dart' if (dart.library.io) 'tts_cache_io.dart';
+
 /// Bộ phát âm tiếng Việt dùng chung cho toàn app.
 ///
 /// Ưu tiên giọng Google Kore (tiếng Việt tự nhiên) qua hàm serverless
 /// `/api/tts` — dùng cho CẢ web lẫn điện thoại, có cache nên tạo 1 lần dùng mãi.
+/// Trên điện thoại còn lưu thêm xuống đĩa (`TtsDiskCache`) để mở app lại
+/// (kể cả mất mạng) vẫn nghe được ngay, không phải gọi mạng lại mỗi lần mở app.
 /// Trên điện thoại, nếu mất mạng / gọi lỗi thì tự quay về giọng iOS có sẵn.
 class TtsService {
   TtsService._();
@@ -29,6 +33,14 @@ class TtsService {
   final Map<String, Uint8List> _cache = {};
   final List<String> _cacheOrder = [];
   static const int _cacheMax = 300;
+
+  // Cache audio xuống đĩa (điện thoại/máy tính) để mở app lại khỏi tải lại.
+  final TtsDiskCache _disk = TtsDiskCache();
+
+  // Tăng mỗi lần speak()/speakSequence()/stop() mới được gọi, để huỷ hẳn
+  // lượt đọc cũ đang chờ giữa chừng (vd bé lướt sang chữ khác quá nhanh),
+  // không để nó "đọc dí theo" khi đã chuyển sang nội dung mới.
+  int _generation = 0;
 
   static const double _defaultRate = 0.42;
 
@@ -61,38 +73,61 @@ class TtsService {
     }
   }
 
-  /// Phát bằng giọng Google Kore qua /api/tts. Trả về true nếu phát được,
-  /// false nếu Google lỗi (để phía trên lùi về giọng trình duyệt/máy).
-  Future<bool> _remoteSpeak(String text) async {
-    final t = text.trim();
-    if (t.isEmpty) return true;
-    try {
-      var bytes = _cache[t];
-      if (bytes == null) {
-        // Chỉ hiện "đang tạo" khi phải gọi mạng (cache thì phát ngay).
-        loading.value = true;
-        try {
-          final resp = await http
-              .get(Uri.parse(_apiUrl(t)))
-              .timeout(const Duration(seconds: 14));
-          final ct = resp.headers['content-type'] ?? '';
-          final isAudio =
-              ct.contains('audio') || ct.contains('wav') || ct.contains('mpeg');
-          if (resp.statusCode != 200 || resp.bodyBytes.length < 200 || !isAudio) {
-            return false; // Google lỗi → 502/JSON → lùi về giọng dự phòng
-          }
-          bytes = resp.bodyBytes;
-          _putCache(t, bytes);
-        } finally {
-          loading.value = false;
-        }
-      }
-      await _player.stop();
-      await _player.play(BytesSource(bytes));
-      return true;
-    } catch (_) {
-      return false;
+  /// Băm ổn định (FNV-1a 32-bit) để đặt tên file cache trên đĩa — không đổi
+  /// giữa các lần mở app, không phụ thuộc runtime (native/web).
+  String _diskKey(String text) {
+    var hash = 0x811c9dc5;
+    for (final unit in text.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
     }
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
+
+  /// Lấy audio đã tạo cho [text] — từ cache RAM/đĩa nếu có, không thì gọi
+  /// mạng tạo mới. Trả về null nếu Google lỗi hẳn (để phía trên lùi về
+  /// giọng dự phòng). CHỈ tải, không phát — để gọi lặp lại khi đánh vần
+  /// nhiều phần mà không phát trùng nhau.
+  Future<Uint8List?> _fetchBytes(String text) async {
+    final t = text.trim();
+    if (t.isEmpty) return null;
+    final cached = _cache[t];
+    if (cached != null) return cached;
+    final fromDisk = await _disk.read(_diskKey(t));
+    if (fromDisk != null) {
+      _putCache(t, fromDisk);
+      return fromDisk;
+    }
+    // Chỉ hiện "đang tạo" khi phải gọi mạng (cache thì phát ngay).
+    loading.value = true;
+    try {
+      final resp = await http
+          .get(Uri.parse(_apiUrl(t)))
+          .timeout(const Duration(seconds: 14));
+      final ct = resp.headers['content-type'] ?? '';
+      final isAudio =
+          ct.contains('audio') || ct.contains('wav') || ct.contains('mpeg');
+      if (resp.statusCode != 200 || resp.bodyBytes.length < 200 || !isAudio) {
+        return null; // Google lỗi → 502/JSON → lùi về giọng dự phòng
+      }
+      final bytes = resp.bodyBytes;
+      _putCache(t, bytes);
+      unawaited(_disk.write(_diskKey(t), bytes));
+      return bytes;
+    } catch (_) {
+      return null;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /// Phát [bytes] và ĐỢI phát xong hẳn mới trả về — để đọc nhiều đoạn nối
+  /// tiếp (đánh vần) không bị đoạn sau đè lên đoạn trước.
+  Future<void> _playBytes(Uint8List bytes) async {
+    await _player.stop();
+    final done = _player.onPlayerComplete.first;
+    await _player.play(BytesSource(bytes));
+    await done.timeout(const Duration(seconds: 10), onTimeout: () {});
   }
 
   Future<void> _ensureNativeTts() async {
@@ -155,27 +190,56 @@ class TtsService {
   /// Đọc một đoạn văn bản tiếng Việt.
   Future<void> speak(String text, {double? rate}) async {
     await init();
-    if (await _remoteSpeak(text)) return;
+    final myGen = ++_generation; // huỷ lượt đọc trước đó nếu còn đang chờ
+    final bytes = await _fetchBytes(text);
+    if (_generation != myGen) return; // đã bị lượt đọc mới hơn / stop() đè lên
+    if (bytes != null) {
+      try {
+        await _playBytes(bytes);
+        return;
+      } catch (_) {
+        // rơi xuống giọng dự phòng bên dưới
+      }
+      if (_generation != myGen) return;
+    }
     // Google lỗi → giọng dự phòng: trình duyệt (web) hoặc giọng máy (native).
     await _nativeSpeak(text, rate: rate);
   }
 
-  /// Đọc lần lượt từng đoạn (đánh vần). Web/native đều gộp thành 1 câu để
-  /// giọng Kore đọc liền có nhịp nghỉ tự nhiên; native lỗi mạng thì đọc rời.
+  /// Đọc lần lượt từng đoạn (đánh vần: "đờ - ô - đô - sắc - đố"). Phát RIÊNG
+  /// từng phần (không gộp thành 1 câu) vì giọng Google hay nuốt/bỏ bớt các
+  /// tiếng không phải từ thật (như "đờ", "sắc") khi đọc gộp cả câu.
   Future<void> speakSequence(
     List<String> parts, {
     double rate = 0.38,
     Duration gap = const Duration(milliseconds: 260),
   }) async {
     await init();
+    final myGen = ++_generation; // huỷ lượt đọc trước đó nếu còn đang chờ
     final clean = parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
-    final joined = clean.join(', ');
-    if (await _remoteSpeak(joined)) return;
-    // Google lỗi → giọng dự phòng đọc rời từng phần.
-    await _nativeSpeakSequence(clean, rate, gap);
+    if (clean.isEmpty) return;
+    for (var i = 0; i < clean.length; i++) {
+      if (_generation != myGen) return; // đã chuyển sang nội dung khác, dừng hẳn
+      try {
+        final bytes = await _fetchBytes(clean[i]);
+        if (_generation != myGen) return;
+        if (bytes == null) {
+          // Google lỗi ở phần này → giọng dự phòng đọc rời từ đây về sau.
+          await _nativeSpeakSequence(clean.sublist(i), rate, gap);
+          return;
+        }
+        await _playBytes(bytes);
+      } catch (_) {
+        if (_generation == myGen) await _nativeSpeakSequence(clean.sublist(i), rate, gap);
+        return;
+      }
+      if (_generation != myGen) return;
+      if (i < clean.length - 1) await Future<void>.delayed(gap);
+    }
   }
 
   Future<void> stop() async {
+    _generation++; // huỷ mọi lượt đọc đang chờ giữa chừng
     try {
       await _player.stop();
     } catch (_) {}
