@@ -33,7 +33,12 @@ class _LettersScreenState extends State<LettersScreen> {
   }
 
   void _speak(LetterItem item) {
-    TtsService.instance.speak('${item.sound}. ${item.exampleWord}');
+    // Đọc chậm, tách rõ: âm chữ cái ... nghỉ ... từ ví dụ.
+    TtsService.instance.speakSequence(
+      [item.sound, item.exampleWord],
+      rate: 0.32,
+      gap: const Duration(milliseconds: 650),
+    );
   }
 
   void _go(int delta) {
