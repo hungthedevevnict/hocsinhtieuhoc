@@ -58,27 +58,21 @@ class TtsService {
     }
   }
 
-  /// Phát bằng giọng Google Kore qua /api/tts. Trả về true nếu phát được.
+  /// Phát bằng giọng Google Kore qua /api/tts. Trả về true nếu phát được,
+  /// false nếu Google lỗi (để phía trên lùi về giọng trình duyệt/máy).
   Future<bool> _remoteSpeak(String text) async {
     final t = text.trim();
     if (t.isEmpty) return true;
     try {
-      if (kIsWeb) {
-        // Web: dùng UrlSource để trình duyệt tự tải + cache, thân thiện autoplay.
-        await _player.stop();
-        await _player.play(UrlSource(_apiUrl(t)));
-        return true;
-      }
-      // Native: tải bytes (có cache trong phiên) rồi phát.
       var bytes = _cache[t];
       if (bytes == null) {
         final resp = await http
             .get(Uri.parse(_apiUrl(t)))
-            .timeout(const Duration(seconds: 12));
+            .timeout(const Duration(seconds: 14));
         final ct = resp.headers['content-type'] ?? '';
         final isAudio = ct.contains('audio') || ct.contains('wav') || ct.contains('mpeg');
         if (resp.statusCode != 200 || resp.bodyBytes.length < 200 || !isAudio) {
-          return false;
+          return false; // Google lỗi → 502/JSON → lùi về giọng dự phòng
         }
         bytes = resp.bodyBytes;
         _putCache(t, bytes);
@@ -152,7 +146,8 @@ class TtsService {
   Future<void> speak(String text, {double? rate}) async {
     await init();
     if (await _remoteSpeak(text)) return;
-    if (!kIsWeb) await _nativeSpeak(text, rate: rate);
+    // Google lỗi → giọng dự phòng: trình duyệt (web) hoặc giọng máy (native).
+    await _nativeSpeak(text, rate: rate);
   }
 
   /// Đọc lần lượt từng đoạn (đánh vần). Web/native đều gộp thành 1 câu để
@@ -166,14 +161,15 @@ class TtsService {
     final clean = parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
     final joined = clean.join(', ');
     if (await _remoteSpeak(joined)) return;
-    if (!kIsWeb) await _nativeSpeakSequence(clean, rate, gap);
+    // Google lỗi → giọng dự phòng đọc rời từng phần.
+    await _nativeSpeakSequence(clean, rate, gap);
   }
 
   Future<void> stop() async {
     try {
       await _player.stop();
     } catch (_) {}
-    if (!kIsWeb && _nativeTtsReady) {
+    if (_nativeTtsReady) {
       try {
         await _tts.stop();
       } catch (_) {}

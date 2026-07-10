@@ -1,13 +1,14 @@
-// Serverless TTS trên Vercel: đọc chữ tiếng Việt.
+// Serverless TTS trên Vercel: đọc chữ tiếng Việt bằng Google (Gemini) giọng Kore.
 //
-// Google (Gemini) giọng Việt hay nhất NHƯNG chập chờn (~40% lần trả "no audio")
-// → thử lại nhiều lần; nếu vẫn hỏng thì fallback sang OpenAI tts-1-hd (ổn định).
+// Google giọng Việt hay nhất NHƯNG chập chờn (~40% lần trả "no audio") → thử lại
+// nhiều lần. Nếu Google hỏng hẳn thì trả 502; phía app tự lùi về giọng trình
+// duyệt / giọng máy (KHÔNG dùng OpenAI vì đọc tiếng Việt lơ lớ).
 // Trả audio + Cache-Control 1 năm → CDN Vercel lưu lại, mỗi chữ chỉ tốn 1 lần.
 //
 // Key ở biến môi trường SHOPAIKEY_API_KEY (Vercel → Settings → Env Vars).
 
 const HOSTS = ['https://api.shopaikey.com', 'https://direct.shopaikey.com'];
-const GOOGLE_TRIES = 6; // Google hay lỗi nên thử nhiều lần
+const GOOGLE_TRIES = 8; // Google hay lỗi nên thử nhiều lần
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Gọi Google 1 lần → trả URL audio hoặc null.
@@ -26,28 +27,6 @@ async function googleOnce(key, text, voice, host) {
     if (r.ok && j && j.url) return j.url;
   } catch (_) {}
   return null;
-}
-
-// OpenAI tts-1-hd → trả bytes mp3 hoặc null.
-async function openaiBytes(key, text, host) {
-  try {
-    const r = await fetch(`${host}/v1/audio/speech`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'tts-1-hd',
-        input: text,
-        voice: 'nova',
-        response_format: 'mp3',
-      }),
-    });
-    if (!r.ok) return null;
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length < 200) return null;
-    return { buf, contentType: r.headers.get('content-type') || 'audio/mpeg' };
-  } catch (_) {
-    return null;
-  }
 }
 
 module.exports = async (req, res) => {
@@ -84,19 +63,8 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 2) Fallback OpenAI tts-1-hd (giọng kém hơn nhưng ổn định, khỏi câm).
-    for (const host of HOSTS) {
-      const out = await openaiBytes(key, text, host);
-      if (out) {
-        res.setHeader('Content-Type', out.contentType);
-        res.setHeader('Cache-Control', 'public, max-age=31536000, s-maxage=31536000, immutable');
-        res.setHeader('X-TTS-Provider', 'openai');
-        res.status(200).send(out.buf);
-        return;
-      }
-    }
-
-    res.status(502).json({ error: 'TTS thất bại cả Google lẫn OpenAI' });
+    // Google hỏng hẳn → 502; app tự lùi về giọng trình duyệt / giọng máy.
+    res.status(502).json({ error: 'Google TTS không phản hồi audio' });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
