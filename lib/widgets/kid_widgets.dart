@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/tts_service.dart';
 import '../theme.dart';
 
 /// Thanh tiêu đề đơn giản, nút quay lại to cho bé dễ bấm.
@@ -201,9 +202,73 @@ class KidScaffold extends StatelessWidget {
         child: Column(
           children: [
             KidAppBar(title: title, color: color, actions: actions),
-            Expanded(child: body),
+            Expanded(
+              child: ValueListenableBuilder<bool>(
+                valueListenable: TtsService.instance.loading,
+                builder: (_, loading, child) => Stack(
+                  children: [
+                    // Chặn chạm khi đang tạo giọng để tránh double-tap.
+                    AbsorbPointer(absorbing: loading, child: child!),
+                    if (loading)
+                      Positioned(
+                        top: 10,
+                        left: 0,
+                        right: 0,
+                        child: Center(child: _TtsLoadingBadge(color: color)),
+                      ),
+                  ],
+                ),
+                child: body,
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Badge nhỏ báo "đang tạo giọng đọc..." hiện ở đỉnh màn hình.
+class _TtsLoadingBadge extends StatelessWidget {
+  final Color color;
+  const _TtsLoadingBadge({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.4),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation(Colors.white),
+            ),
+          ),
+          SizedBox(width: 10),
+          Text(
+            'Đang tạo giọng đọc...',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

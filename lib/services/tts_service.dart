@@ -22,6 +22,9 @@ class TtsService {
   bool _ready = false;
   bool _nativeTtsReady = false;
 
+  /// True khi đang gọi mạng tạo giọng (để UI hiện "đang tạo" + chặn double-tap).
+  final ValueNotifier<bool> loading = ValueNotifier<bool>(false);
+
   // Cache audio trong phiên (theo chữ) để chữ lặp (bờ, ê, dấu...) khỏi tải lại.
   final Map<String, Uint8List> _cache = {};
   final List<String> _cacheOrder = [];
@@ -66,16 +69,23 @@ class TtsService {
     try {
       var bytes = _cache[t];
       if (bytes == null) {
-        final resp = await http
-            .get(Uri.parse(_apiUrl(t)))
-            .timeout(const Duration(seconds: 14));
-        final ct = resp.headers['content-type'] ?? '';
-        final isAudio = ct.contains('audio') || ct.contains('wav') || ct.contains('mpeg');
-        if (resp.statusCode != 200 || resp.bodyBytes.length < 200 || !isAudio) {
-          return false; // Google lỗi → 502/JSON → lùi về giọng dự phòng
+        // Chỉ hiện "đang tạo" khi phải gọi mạng (cache thì phát ngay).
+        loading.value = true;
+        try {
+          final resp = await http
+              .get(Uri.parse(_apiUrl(t)))
+              .timeout(const Duration(seconds: 14));
+          final ct = resp.headers['content-type'] ?? '';
+          final isAudio =
+              ct.contains('audio') || ct.contains('wav') || ct.contains('mpeg');
+          if (resp.statusCode != 200 || resp.bodyBytes.length < 200 || !isAudio) {
+            return false; // Google lỗi → 502/JSON → lùi về giọng dự phòng
+          }
+          bytes = resp.bodyBytes;
+          _putCache(t, bytes);
+        } finally {
+          loading.value = false;
         }
-        bytes = resp.bodyBytes;
-        _putCache(t, bytes);
       }
       await _player.stop();
       await _player.play(BytesSource(bytes));
