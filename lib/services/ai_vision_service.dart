@@ -3,11 +3,12 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-import '../data/app_data.dart';
 import 'ai_key_store.dart';
 
-/// Gọi ShopAIKey (proxy chuẩn OpenAI) để đọc ảnh chụp bài học và tự tách
-/// thành các từ ghép 2 tiếng (âm đầu + vần + thanh) dùng được trong app.
+/// Gọi ShopAIKey (proxy chuẩn OpenAI) để ĐỌC CHỮ trong ảnh chụp bài học.
+/// Chỉ làm OCR thuần — việc tách âm đầu/vần/thanh để bộ phân tích riêng của
+/// app (`syllable_parser.dart`, đã có test) xử lý, tránh AI đoán sai phần
+/// ngữ âm mà nó không cần phải hiểu.
 ///
 /// Xem tài liệu: ShopAIKey API — endpoint /v1/chat/completions kiểu OpenAI,
 /// auth Header `Authorization: Bearer API_KEY`.
@@ -15,43 +16,25 @@ class AiVisionService {
   AiVisionService._();
   static final AiVisionService instance = AiVisionService._();
 
-  // Model rẻ, đủ tốt cho việc đọc chữ + tách âm/vần (theo khuyến nghị tài liệu).
-  static const _model = 'gpt-4o-mini';
+  // Model mạnh để đọc chữ ảnh chính xác (gpt-4o-mini đọc dấu tiếng Việt hay sai).
+  static const _model = 'gpt-4o';
 
   static const _systemPrompt =
-      'Bạn là trợ lý đọc sách giáo khoa Tiếng Việt lớp 1 cho học sinh mới học đánh vần.';
+      'Bạn là trợ lý đọc chữ trong ảnh sách/bài tập Tiếng Việt cho học sinh lớp 1.';
 
   static const _userPrompt = '''
-Nhìn ảnh trang sách/bài tập đánh vần tiếng Việt. Tìm các TỪ GHÉP gồm ĐÚNG 2 TIẾNG.
+Đọc TẤT CẢ các từ tiếng Việt có trong ảnh này, đừng bỏ sót từ nào.
+Ảnh có thể trình bày nhiều cột — đọc theo thứ tự từ trái sang phải, từ trên xuống dưới.
 
-CHỈ lấy tiếng thoả TẤT CẢ điều kiện sau (bỏ qua tiếng không thoả):
-- Có ĐÚNG 1 phụ âm đầu (vd: b, c, ch, d, đ, g, gi, h, kh, l, m, n, ng, nh, ph, qu, r, s, t, th, tr, v, x).
-- Vần chỉ là 1 NGUYÊN ÂM ĐƠN trong nhóm: a, e, ê, i, o, ô, ơ, u, ư (KHÔNG lấy nguyên âm đôi/ba như iê, ươ, oa; KHÔNG có âm cuối như n, t, c, m, ng, nh).
-- Có thanh điệu rõ ràng (ngang/sắc/huyền/hỏi/ngã/nặng).
+Mỗi cụm từ (thường gồm 2 tiếng, vd "Bờ đê", "Bố mẹ") là MỘT dòng kết quả riêng, giữ đúng thứ tự
+tiếng trong cụm đó.
 
-Bỏ qua hoàn toàn các từ có tiếng không thoả điều kiện trên (vd "con", "bàn", "yêu"...).
-
-Trả về DUY NHẤT một mảng JSON (không markdown, không giải thích thêm), theo đúng khuôn:
-[
-  {
-    "word": "bờ đê",
-    "emoji": "🏞️",
-    "syllables": [
-      {"letter": "b", "sound": "bờ", "vowel": "ơ", "tone": 0},
-      {"letter": "đ", "sound": "đờ", "vowel": "ê", "tone": 0}
-    ]
-  }
-]
-Trong đó "tone": 0=ngang, 1=sắc, 2=huyền, 3=hỏi, 4=ngã, 5=nặng.
-"vowel" chỉ được là một trong: a, e, ê, i, o, ô, ơ, u, ư.
-"sound" là cách đọc âm đầu (vd b→"bờ", ch→"chờ", ng→"ngờ", qu→"quờ").
-"emoji" chọn 1 icon hợp với nghĩa của từ.
-Nếu không tìm được từ nào phù hợp, trả về mảng rỗng [].
+Giữ NGUYÊN dấu tiếng Việt, viết chữ thường. Chỉ trả về danh sách, mỗi từ 1 dòng — KHÔNG đánh số,
+KHÔNG markdown, KHÔNG giải thích gì thêm.
 ''';
 
-  /// Gửi ảnh lên AI, trả về danh sách từ ghép hợp lệ (đã lọc theo đúng công thức
-  /// âm đầu + 1 nguyên âm đơn + thanh mà app đang dùng).
-  Future<List<CompoundWord>> extractCompoundWords(Uint8List imageBytes) async {
+  /// Gửi ảnh lên AI, trả về các dòng chữ đọc được (nguyên văn, chưa lọc).
+  Future<List<String>> extractWordLines(Uint8List imageBytes) async {
     final apiKey = await AiKeyStore.instance.getKey();
     if (apiKey == null) {
       throw AiVisionException('Chưa có API key. Vui lòng nhập ShopAIKey.');
@@ -116,54 +99,24 @@ Nếu không tìm được từ nào phù hợp, trả về mảng rỗng [].
     final decoded = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     final content = decoded['choices']?[0]?['message']?['content'] as String?;
     if (content == null || content.trim().isEmpty) {
-      throw AiVisionException('AI không trả về nội dung.');
+      throw AiVisionException('AI không đọc được chữ nào trong ảnh này.');
     }
 
-    return _parseWords(content);
+    return _cleanLines(content);
   }
 
-  List<CompoundWord> _parseWords(String content) {
-    // AI đôi khi bọc JSON trong ```json ... ``` — bóc lớp markdown nếu có.
+  List<String> _cleanLines(String content) {
+    // AI đôi khi bọc trong ```...``` hoặc thêm gạch đầu dòng/số thứ tự — bóc hết.
     var text = content.trim();
-    final fence = RegExp(r'```(?:json)?\s*([\s\S]*?)```');
+    final fence = RegExp(r'```(?:[a-zA-Z]*)?\s*([\s\S]*?)```');
     final m = fence.firstMatch(text);
     if (m != null) text = m.group(1)!.trim();
 
-    List<dynamic> raw;
-    try {
-      raw = jsonDecode(text) as List<dynamic>;
-    } catch (_) {
-      throw AiVisionException('Không đọc được kết quả từ AI. Thử ảnh khác rõ hơn nhé.');
-    }
-
-    final result = <CompoundWord>[];
-    for (final item in raw) {
-      final word = _parseOneWord(item as Map<String, dynamic>);
-      if (word != null) result.add(word);
-    }
-    return result;
-  }
-
-  CompoundWord? _parseOneWord(Map<String, dynamic> item) {
-    final rawSyllables = item['syllables'] as List<dynamic>?;
-    if (rawSyllables == null || rawSyllables.length != 2) return null;
-
-    final specs = <SyllableSpec>[];
-    for (final s in rawSyllables) {
-      final map = s as Map<String, dynamic>;
-      final letter = (map['letter'] as String?)?.trim() ?? '';
-      final sound = (map['sound'] as String?)?.trim() ?? '';
-      final vowel = (map['vowel'] as String?)?.trim() ?? '';
-      final tone = map['tone'];
-      if (sound.isEmpty) return null;
-      if (!tonedVowels.containsKey(vowel)) return null;
-      if (tone is! int || tone < 0 || tone > 5) return null;
-      specs.add(SyllableSpec(letter, sound, vowel, tone));
-    }
-
-    final emojiRaw = (item['emoji'] as String?)?.trim();
-    final emoji = (emojiRaw != null && emojiRaw.isNotEmpty) ? emojiRaw : '📚';
-    return CompoundWord(emoji, specs);
+    return text
+        .split('\n')
+        .map((l) => l.trim().replaceFirst(RegExp(r'^[-*•\d]+[.)]?\s*'), ''))
+        .where((l) => l.isNotEmpty)
+        .toList();
   }
 }
 

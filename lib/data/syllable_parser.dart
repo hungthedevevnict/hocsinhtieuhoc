@@ -1,11 +1,11 @@
 import 'app_data.dart';
 
-/// Tách 1 tiếng gõ tay (vd "đề", "bờ", "cá") thành âm đầu + vần + thanh,
-/// để tạo SyllableSpec mà không cần bố mẹ chọn từng chip.
+/// Tách 1 tiếng gõ tay (vd "đề", "con", "bàn") thành âm đầu + vần (nguyên âm
+/// + âm cuối) + thanh, để tạo SyllableSpec mà không cần bố mẹ chọn từng chip.
 ///
-/// Chỉ nhận tiếng đơn giản: 1 âm đầu (có thể rỗng) + 1 NGUYÊN ÂM ĐƠN
-/// (a,e,ê,i,o,ô,ơ,u,ư) + 1 thanh. Trả về null nếu tiếng có âm cuối,
-/// nguyên âm đôi/ba, hoặc âm đầu không nhận diện được.
+/// Chỉ nhận tiếng có 1 NGUYÊN ÂM ĐƠN (a,ă,â,e,ê,i,o,ô,ơ,u,ư) làm vần — CHƯA
+/// hỗ trợ nguyên âm đôi/ba (iê, ươ, oa...). Âm cuối (nếu có) phải là 1 trong
+/// 8 âm cuối hợp lệ: c, ch, m, n, ng, nh, p, t.
 
 /// Các cụm phụ âm đầu, xếp dài → ngắn để so khớp tham lam đúng thứ tự.
 const List<String> _onsetCandidates = [
@@ -28,22 +28,34 @@ final Map<String, (String vowel, int tone)> _reverseTone = {
     for (var t = 0; t < entry.value.length; t++) entry.value[t]: (entry.key, t),
 };
 
+/// Thử tách [remainder] (phần còn lại sau âm đầu) thành nguyên âm (+ dấu)
+/// và âm cuối tuỳ chọn. Trả về null nếu không khớp (vd nguyên âm đôi).
+(String vowel, int tone, String coda)? _splitRime(String remainder) {
+  if (remainder.isEmpty) return null;
+  final vowelChar = remainder.substring(0, 1);
+  final coda = remainder.substring(1);
+  final hit = _reverseTone[vowelChar];
+  if (hit == null) return null;
+  if (coda.isEmpty) return (hit.$1, hit.$2, '');
+  if (validFinals.contains(coda)) return (hit.$1, hit.$2, coda);
+  return null;
+}
+
 SyllableSpec? parseSyllable(String rawInput) {
   final s = rawInput.trim().toLowerCase();
   if (s.isEmpty) return null;
 
   for (final onset in _onsetCandidates) {
     if (!s.startsWith(onset)) continue;
-    final remainder = s.substring(onset.length);
-    final hit = _reverseTone[remainder];
-    if (hit != null) {
-      return SyllableSpec(onset, _onsetSound[onset]!, hit.$1, hit.$2);
+    final rime = _splitRime(s.substring(onset.length));
+    if (rime != null) {
+      return SyllableSpec(onset, _onsetSound[onset]!, rime.$1, rime.$2, rime.$3);
     }
   }
   // Không có âm đầu (tiếng bắt đầu ngay bằng nguyên âm), vd "ở", "ăn".
-  final hit = _reverseTone[s];
-  if (hit != null) {
-    return SyllableSpec('', hit.$1, hit.$1, hit.$2);
+  final rime = _splitRime(s);
+  if (rime != null) {
+    return SyllableSpec('', rime.$1, rime.$1, rime.$2, rime.$3);
   }
   return null;
 }

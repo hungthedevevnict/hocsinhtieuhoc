@@ -1,35 +1,52 @@
 import 'package:flutter/material.dart';
 
 import '../data/app_data.dart';
-import '../data/custom_words_store.dart';
+import '../data/lesson_store.dart';
 import '../data/syllable_parser.dart';
 import '../theme.dart';
 import '../widgets/kid_widgets.dart';
 
-/// Cho bố mẹ gõ tay nhiều từ ghép, mỗi dòng 1 từ (2 tiếng), rồi lưu 1 lần.
-/// Vd gõ:
+/// Cho bố mẹ gõ tay nhiều từ ghép, mỗi dòng 1 từ (2 tiếng), đặt tên cho cả
+/// bài rồi lưu 1 lần. Vd gõ:
 ///   bờ đê
 ///   cá rô 🐟
 ///   ba mẹ
 class AddCompoundWordScreen extends StatefulWidget {
-  const AddCompoundWordScreen({super.key});
+  /// Nội dung có sẵn để điền vào ô nhập từ (vd chữ AI vừa đọc từ ảnh),
+  /// bố mẹ xem lại, sửa/thêm rồi mới lưu — không tự lưu ngầm.
+  final String? initialText;
+  final String? initialTitle;
+  const AddCompoundWordScreen({super.key, this.initialText, this.initialTitle});
 
   @override
   State<AddCompoundWordScreen> createState() => _AddCompoundWordScreenState();
 }
 
 class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
-  final _ctrl = TextEditingController();
+  late final TextEditingController _wordsCtrl;
+  late final TextEditingController _titleCtrl;
   bool _saving = false;
+  String? _lessonId; // set sau lần lưu đầu tiên, để lần lưu sau cộng vào cùng bài
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _wordsCtrl = TextEditingController(text: widget.initialText ?? '');
+    _titleCtrl = TextEditingController(
+      text: widget.initialTitle ?? 'Bài ${now.day}/${now.month}',
+    );
+  }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _wordsCtrl.dispose();
+    _titleCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    final lines = _ctrl.text.split('\n');
+    final lines = _wordsCtrl.text.split('\n');
     final goodWords = <CompoundWord>[];
     final failedLines = <String>[];
     final remainingLines = <String>[];
@@ -52,11 +69,16 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
 
     setState(() => _saving = true);
     if (goodWords.isNotEmpty) {
-      await CustomWordsStore.instance.addAll(goodWords);
+      if (_lessonId == null) {
+        final lesson = await LessonsStore.instance.addLesson(_titleCtrl.text, goodWords);
+        _lessonId = lesson.id;
+      } else {
+        await LessonsStore.instance.appendWords(_lessonId!, goodWords);
+      }
     }
     setState(() {
       _saving = false;
-      _ctrl.text = remainingLines.join('\n');
+      _wordsCtrl.text = remainingLines.join('\n');
     });
 
     if (!mounted) return;
@@ -65,7 +87,7 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
       Navigator.of(context).pop(true);
     } else {
       _showMessage(
-        '${goodWords.isNotEmpty ? "Đã lưu ${goodWords.length} từ. " : ""}'
+        '${goodWords.isNotEmpty ? "Đã lưu ${goodWords.length} từ vào bài. " : ""}'
         'Còn ${failedLines.length} dòng chưa hiểu, sửa lại rồi bấm Lưu tiếp nhé.',
       );
     }
@@ -87,6 +109,18 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            TextField(
+              controller: _titleCtrl,
+              enabled: _lessonId == null,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              decoration: InputDecoration(
+                labelText: 'Tên bài',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
               'Mỗi dòng gõ 1 từ, đủ 2 tiếng cách nhau bằng dấu cách. '
               'Thêm emoji ở cuối dòng cũng được (không bắt buộc).',
@@ -116,8 +150,8 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
             const SizedBox(height: 14),
             Expanded(
               child: TextField(
-                controller: _ctrl,
-                autofocus: true,
+                controller: _wordsCtrl,
+                autofocus: widget.initialText == null,
                 maxLines: null,
                 expands: true,
                 textAlignVertical: TextAlignVertical.top,
@@ -139,7 +173,7 @@ class _AddCompoundWordScreenState extends State<AddCompoundWordScreen> {
               width: double.infinity,
               child: Center(
                 child: KidButton(
-                  label: _saving ? 'Đang lưu...' : 'Lưu tất cả',
+                  label: _saving ? 'Đang lưu...' : 'Lưu bài này',
                   icon: Icons.check_circle_rounded,
                   color: AppColors.words,
                   onTap: _saving ? () {} : _save,

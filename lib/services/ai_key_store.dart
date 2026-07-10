@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,6 +39,9 @@ class AiKeyStore {
   }
 
   Future<String?> getKey() async {
+    // Trên web KHÔNG dùng key (tránh lộ key ra bản web công khai + bị CORS chặn).
+    if (kIsWeb) return null;
+
     final fromEnv = await _loadFromEnvAsset();
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
 

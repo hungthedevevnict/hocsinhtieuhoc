@@ -4,7 +4,6 @@ import '../data/app_data.dart';
 import '../services/tts_service.dart';
 import '../theme.dart';
 import '../widgets/kid_widgets.dart';
-import '../widgets/mic_check.dart';
 
 class BlendingScreen extends StatefulWidget {
   const BlendingScreen({super.key});
@@ -74,23 +73,17 @@ class _BlendingScreenState extends State<BlendingScreen> {
               ),
             ),
           ),
-          // Nút Đánh vần + Mic.
+          // Nút Đánh vần.
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                KidButton(
-                  label: 'Đánh vần',
-                  icon: Icons.hearing_rounded,
-                  color: AppColors.tones,
-                  fontSize: 22,
-                  onTap: _spellOut,
-                ),
-                const SizedBox(width: 24),
-                MicCheck(target: _syllable, color: AppColors.sunny, size: 62),
-              ],
+            child: Center(
+              child: KidButton(
+                label: 'Đánh vần',
+                icon: Icons.hearing_rounded,
+                color: AppColors.tones,
+                fontSize: 22,
+                onTap: _spellOut,
+              ),
             ),
           ),
           _picker(

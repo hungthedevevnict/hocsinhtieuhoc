@@ -87,6 +87,9 @@ const List<String> vowels = ['a', 'e', 'ê', 'i', 'o', 'ô', 'ơ', 'u', 'ư'];
 /// Dùng để ghép dấu vào tiếng khi đánh vần (b + ô + sắc = bố).
 const Map<String, List<String>> tonedVowels = {
   'a': ['a', 'á', 'à', 'ả', 'ã', 'ạ'],
+  // ă, â chỉ xuất hiện trong tiếng có âm cuối (ăn, âm...), không đứng 1 mình.
+  'ă': ['ă', 'ắ', 'ằ', 'ẳ', 'ẵ', 'ặ'],
+  'â': ['â', 'ấ', 'ầ', 'ẩ', 'ẫ', 'ậ'],
   'e': ['e', 'é', 'è', 'ẻ', 'ẽ', 'ẹ'],
   'ê': ['ê', 'ế', 'ề', 'ể', 'ễ', 'ệ'],
   'i': ['i', 'í', 'ì', 'ỉ', 'ĩ', 'ị'],
@@ -120,6 +123,9 @@ String buildSyllable(String initialLetter, String vowel, int toneIndex) {
   final v = tonedVowels[vowel]?[toneIndex] ?? vowel;
   return '$initialLetter$v';
 }
+
+/// 8 âm cuối hợp lệ trong tiếng Việt (không có âm cuối nào khác).
+const Set<String> validFinals = {'c', 'ch', 'm', 'n', 'ng', 'nh', 'p', 't'};
 
 /// Từ mẫu minh hoạ cho một tiếng (để bé thấy tiếng đó dùng trong từ thật).
 class WordExample {
@@ -316,21 +322,49 @@ const List<WordItem> pictureWords = [
 
 /// Một tiếng trong từ ghép, đủ thông tin để đánh vần riêng tiếng đó.
 /// Vd: SyllableSpec('b', 'bờ', 'ơ', 0) => tiếng "bờ" (âm đầu b, vần ơ, thanh ngang).
+/// [coda] là âm cuối (vd "n" trong "con"), để trống '' nếu tiếng mở.
 class SyllableSpec {
   final String letter; // chữ viết âm đầu: "b", "đ", "c", "g"...
   final String sound; // đọc âm: "bờ", "đờ", "cờ", "gờ"...
-  final String vowel; // vần (nguyên âm): "ơ", "ê", "a"...
+  final String vowel; // nguyên âm (không âm cuối): "ơ", "ê", "a"...
   final int tone; // chỉ số thanh trong tones6 (0=ngang...5=nặng)
+  final String coda; // âm cuối: '', 'c','ch','m','n','ng','nh','p','t'
 
-  const SyllableSpec(this.letter, this.sound, this.vowel, this.tone);
+  const SyllableSpec(this.letter, this.sound, this.vowel, this.tone, [this.coda = '']);
 
-  String get syllable => buildSyllable(letter, vowel, tone);
-  String get base => '$letter$vowel';
+  /// Đọc âm cuối (dùng chung bảng đọc phụ âm với âm đầu).
+  static const Map<String, String> _consonantSound = {
+    'b': 'bờ', 'c': 'cờ', 'ch': 'chờ', 'd': 'dờ', 'đ': 'đờ', 'g': 'gờ', 'gi': 'giờ',
+    'h': 'hờ', 'k': 'cờ', 'kh': 'khờ', 'l': 'lờ', 'm': 'mờ', 'n': 'nờ', 'ng': 'ngờ',
+    'ngh': 'ngờ', 'nh': 'nhờ', 'p': 'pờ', 'ph': 'phờ', 'qu': 'quờ', 'r': 'rờ',
+    's': 'sờ', 't': 'tờ', 'th': 'thờ', 'tr': 'trờ', 'v': 'vờ', 'x': 'xờ',
+  };
 
-  /// Đánh vần riêng tiếng này: "bờ - ơ - bờ" hoặc "đờ - ê - đê - huyền - đề".
-  List<String> get spellParts => tone == 0
-      ? [sound, vowel, base]
-      : [sound, vowel, base, tones6[tone].name, syllable];
+  /// Vần (nguyên âm + âm cuối, chưa có dấu): "ơ" hoặc "on", "anh"...
+  String get rime => '$vowel$coda';
+
+  /// Tiếng chưa có dấu: "bơ" hoặc "con", "canh"...
+  String get base => '$letter$rime';
+
+  String get syllable => '$letter${tonedVowels[vowel]![tone]}$coda';
+
+  /// Đánh vần riêng tiếng này.
+  /// - Tiếng mở: "bờ - ơ - bờ" hoặc "đờ - ê - đê - huyền - đề".
+  /// - Tiếng có âm cuối: "o - n - on - cờ - on - con" hoặc thêm dấu:
+  ///   "o - n - on - cờ - on - con - huyền - còn".
+  List<String> get spellParts {
+    if (coda.isEmpty) {
+      return tone == 0
+          ? [sound, vowel, base]
+          : [sound, vowel, base, tones6[tone].name, syllable];
+    }
+    final codaSound = _consonantSound[coda] ?? coda;
+    // Không có âm đầu (vd "ăn"): chỉ cần đánh vần phần vần, không ghép thêm.
+    final steps = letter.isEmpty
+        ? [vowel, codaSound, rime]
+        : [vowel, codaSound, rime, sound, rime, base];
+    return tone == 0 ? steps : [...steps, tones6[tone].name, syllable];
+  }
 }
 
 /// Một từ ghép 2 tiếng để bé luyện đánh vần nối tiếng, vd "bờ đê".
@@ -341,27 +375,6 @@ class CompoundWord {
 
   String get word => syllables.map((s) => s.syllable).join(' ');
 }
-
-/// Các từ ghép quen thuộc với bé lớp 1, mỗi tiếng đều đánh vần được
-/// theo đúng công thức âm đầu + vần + thanh.
-const List<CompoundWord> compoundWords = [
-  CompoundWord('🏞️', [SyllableSpec('b', 'bờ', 'ơ', 0), SyllableSpec('đ', 'đờ', 'ê', 0)]), // bờ đê
-  CompoundWord('🐟', [SyllableSpec('c', 'cờ', 'a', 1), SyllableSpec('r', 'rờ', 'ô', 0)]), // cá rô
-  CompoundWord('👨‍👩‍👧', [SyllableSpec('b', 'bờ', 'a', 0), SyllableSpec('m', 'mờ', 'ê', 5)]), // ba mẹ
-  CompoundWord('👨‍👩‍👧', [SyllableSpec('b', 'bờ', 'ô', 1), SyllableSpec('m', 'mờ', 'ê', 5)]), // bố mẹ
-  CompoundWord('👧', [SyllableSpec('c', 'cờ', 'ô', 0), SyllableSpec('b', 'bờ', 'e', 1)]), // cô bé
-  CompoundWord('👵', [SyllableSpec('b', 'bờ', 'a', 2), SyllableSpec('c', 'cờ', 'u', 5)]), // bà cụ
-  CompoundWord('⛏️', [SyllableSpec('th', 'thờ', 'ơ', 5), SyllableSpec('m', 'mờ', 'o', 3)]), // thợ mỏ
-  CompoundWord('🍲', [SyllableSpec('c', 'cờ', 'a', 1), SyllableSpec('kh', 'khờ', 'o', 0)]), // cá kho
-  CompoundWord('👩', [SyllableSpec('c', 'cờ', 'ô', 0), SyllableSpec('d', 'dờ', 'i', 2)]), // cô dì
-  CompoundWord('👶', [SyllableSpec('b', 'bờ', 'e', 1), SyllableSpec('th', 'thờ', 'ơ', 0)]), // bé thơ
-  CompoundWord('✍️', [SyllableSpec('nh', 'nhờ', 'a', 2), SyllableSpec('th', 'thờ', 'ơ', 0)]), // nhà thơ
-  CompoundWord('🐠', [SyllableSpec('c', 'cờ', 'a', 1), SyllableSpec('m', 'mờ', 'e', 2)]), // cá mè
-  CompoundWord('👫', [SyllableSpec('c', 'cờ', 'ô', 0), SyllableSpec('ch', 'chờ', 'u', 1)]), // cô chú
-  CompoundWord('🐔', [SyllableSpec('g', 'gờ', 'a', 2), SyllableSpec('m', 'mờ', 'ê', 5)]), // gà mẹ
-  CompoundWord('🐓', [SyllableSpec('g', 'gờ', 'a', 2), SyllableSpec('t', 'tờ', 'ơ', 0)]), // gà tơ
-  CompoundWord('👶', [SyllableSpec('b', 'bờ', 'e', 1), SyllableSpec('nh', 'nhờ', 'o', 3)]), // bé nhỏ
-];
 
 /// Câu khen khi bé làm đúng / chạm chữ.
 const List<String> praises = [

@@ -4,7 +4,6 @@ import '../data/app_data.dart';
 import '../services/tts_service.dart';
 import '../theme.dart';
 import '../widgets/kid_widgets.dart';
-import '../widgets/mic_check.dart';
 
 class LettersScreen extends StatefulWidget {
   const LettersScreen({super.key});
@@ -197,9 +196,6 @@ class _LetterCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          // Bé đọc theo từ ví dụ.
-          MicCheck(target: item.exampleWord, color: color, size: 60),
         ],
       ),
     );

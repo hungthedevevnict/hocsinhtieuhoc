@@ -18,8 +18,21 @@ void main() {
     }
   });
 
-  test('Từ chối tiếng có âm cuối hoặc vần đôi', () {
-    for (final word in ['con', 'bàn', 'yêu', 'oanh', 'ngoan']) {
+  test('Tách đúng tiếng có âm cuối', () {
+    final cases = <String, String>{
+      'con': 'con', 'bàn': 'bàn', 'còn': 'còn', 'cơm': 'cơm',
+      'bát': 'bát', 'sách': 'sách', 'thóc': 'thóc', 'ngon': 'ngon',
+      'ăn': 'ăn', 'ấm': 'ấm',
+    };
+    for (final entry in cases.entries) {
+      final spec = parseSyllable(entry.key);
+      expect(spec, isNotNull, reason: 'Không tách được "${entry.key}"');
+      expect(spec!.syllable, entry.value, reason: 'Sai kết quả cho "${entry.key}"');
+    }
+  });
+
+  test('Từ chối tiếng có nguyên âm đôi/ba (chưa hỗ trợ)', () {
+    for (final word in ['yêu', 'oanh', 'ngoan', 'ngoài', 'huy']) {
       expect(parseSyllable(word), isNull, reason: '"$word" không nên tách được');
     }
   });

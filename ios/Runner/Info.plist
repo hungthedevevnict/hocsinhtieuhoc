@@ -9,9 +9,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>Bé Đánh Vần</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ứng dụng dùng micro để nghe bé đọc và giúp bé luyện phát âm tiếng Việt.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Ứng dụng nhận diện giọng nói để kiểm tra bé đọc đúng chữ hay chưa.</string>
+	<string>Ứng dụng dùng micro để ghi âm bé đọc bài, để bố mẹ nghe lại.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Ứng dụng dùng camera để chụp bài học, nhờ AI đọc và tạo từ ghép mới.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

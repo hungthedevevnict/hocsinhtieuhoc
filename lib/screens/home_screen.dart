@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import 'blending_screen.dart';
-import 'compound_words_screen.dart';
+import 'lessons_screen.dart';
 import 'letters_screen.dart';
 import 'tones_screen.dart';
 import 'words_screen.dart';
@@ -41,7 +41,7 @@ class HomeScreen extends StatelessWidget {
         title: 'Từ Ghép',
         emoji: '🔗',
         color: AppColors.compound,
-        builder: (_) => const CompoundWordsScreen(),
+        builder: (_) => const LessonsScreen(),
       ),
     ];
 
