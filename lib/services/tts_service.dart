@@ -21,6 +21,10 @@ class TtsService {
   /// Domain đã deploy trên Vercel (dùng cho bản điện thoại gọi /api/tts).
   static const String _apiBase = 'https://tuhoc.vercel.app';
 
+  /// Phiên bản giọng — BUMP mỗi khi đổi nhà cung cấp/giọng để bỏ qua cache cũ
+  /// (CDN Vercel + cache trên máy) và tạo lại bằng giọng mới. mm1 = MiniMax cute_boy.
+  static const String _ttsVersion = 'mm1';
+
   final FlutterTts _tts = FlutterTts();
   final AudioPlayer _player = AudioPlayer();
   bool _ready = false;
@@ -62,7 +66,8 @@ class TtsService {
 
   String _apiUrl(String text) {
     final base = kIsWeb ? Uri.base.origin : _apiBase;
-    return '$base/api/tts?text=${Uri.encodeQueryComponent(text)}';
+    // Kèm v=<phiên bản giọng> để đổi giọng thì cache CDN cũ bị bỏ qua.
+    return '$base/api/tts?text=${Uri.encodeQueryComponent(text)}&v=$_ttsVersion';
   }
 
   void _putCache(String key, Uint8List bytes) {
@@ -77,7 +82,8 @@ class TtsService {
   /// giữa các lần mở app, không phụ thuộc runtime (native/web).
   String _diskKey(String text) {
     var hash = 0x811c9dc5;
-    for (final unit in text.codeUnits) {
+    // Kèm phiên bản giọng vào khoá → đổi giọng thì file cache cũ trên máy bị bỏ qua.
+    for (final unit in '$_ttsVersion|$text'.codeUnits) {
       hash ^= unit;
       hash = (hash * 0x01000193) & 0xFFFFFFFF;
     }
