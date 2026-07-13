@@ -206,9 +206,10 @@ class TtsService {
     await _nativeSpeak(text, rate: rate);
   }
 
-  /// Đọc lần lượt từng đoạn (đánh vần: "đờ - ô - đô - sắc - đố"). Phát RIÊNG
-  /// từng phần (không gộp thành 1 câu) vì giọng Google hay nuốt/bỏ bớt các
-  /// tiếng không phải từ thật (như "đờ", "sắc") khi đọc gộp cả câu.
+  /// Đọc đánh vần ("đờ - ô - đô - sắc - đố"). GỘP thành 1 câu (ngăn bằng dấu
+  /// phẩy) rồi đọc 1 lần: Google có ngữ cảnh cả câu nên phát âm chuẩn giọng
+  /// Việt — đọc rời từng âm ngắn sẽ bị "Tây nói tiếng Việt". Google lỗi thì
+  /// lùi về giọng máy (đọc rời từng phần).
   Future<void> speakSequence(
     List<String> parts, {
     double rate = 0.38,
@@ -218,24 +219,20 @@ class TtsService {
     final myGen = ++_generation; // huỷ lượt đọc trước đó nếu còn đang chờ
     final clean = parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
     if (clean.isEmpty) return;
-    for (var i = 0; i < clean.length; i++) {
-      if (_generation != myGen) return; // đã chuyển sang nội dung khác, dừng hẳn
+    final joined = clean.join(', ');
+    final bytes = await _fetchBytes(joined);
+    if (_generation != myGen) return; // đã bị lượt đọc mới hơn / stop() đè lên
+    if (bytes != null) {
       try {
-        final bytes = await _fetchBytes(clean[i]);
-        if (_generation != myGen) return;
-        if (bytes == null) {
-          // Google lỗi ở phần này → giọng dự phòng đọc rời từ đây về sau.
-          await _nativeSpeakSequence(clean.sublist(i), rate, gap);
-          return;
-        }
         await _playBytes(bytes);
-      } catch (_) {
-        if (_generation == myGen) await _nativeSpeakSequence(clean.sublist(i), rate, gap);
         return;
+      } catch (_) {
+        // rơi xuống giọng dự phòng bên dưới
       }
       if (_generation != myGen) return;
-      if (i < clean.length - 1) await Future<void>.delayed(gap);
     }
+    // Google lỗi → giọng máy đọc rời từng phần.
+    await _nativeSpeakSequence(clean, rate, gap);
   }
 
   Future<void> stop() async {
