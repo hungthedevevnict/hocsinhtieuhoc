@@ -23,7 +23,7 @@ class TtsService {
 
   /// Phiên bản giọng — BUMP mỗi khi đổi nhà cung cấp/giọng để bỏ qua cache cũ
   /// (CDN Vercel + cache trên máy) và tạo lại bằng giọng mới. mm1 = MiniMax cute_boy.
-  static const String _ttsVersion = 'mm1';
+  static const String _ttsVersion = 'mm2';
 
   final FlutterTts _tts = FlutterTts();
   final AudioPlayer _player = AudioPlayer();

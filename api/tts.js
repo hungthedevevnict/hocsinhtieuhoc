@@ -27,7 +27,7 @@ async function minimaxOnce(key, text, voiceId, host) {
         language_boost: 'Vietnamese',
         voice_setting: {
           voice_id: voiceId,
-          speed: 1.0,
+          speed: 0.8, // đọc chậm chút cho bé dễ nghe
           vol: 1,
           pitch: 0,
           english_normalization: false,
